@@ -345,9 +345,9 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
         //Initialise Buttons
 
-        dynamic_changeValue = (EditText) rootView.findViewById(R.id.dynamic_buffer);
-        submit = (Button) rootView.findViewById(R.id.submit);
-        submit.setOnClickListener(NSGIMapFragmentActivity.this);
+       // dynamic_changeValue = (EditText) rootView.findViewById(R.id.dynamic_buffer);
+      //  submit = (Button) rootView.findViewById(R.id.submit);
+      //  submit.setOnClickListener(NSGIMapFragmentActivity.this);
         re_center = (ImageButton) rootView.findViewById(R.id.re_center);
         re_center.setOnClickListener(NSGIMapFragmentActivity.this);
         change_map_options = (ImageButton) rootView.findViewById(R.id.change_map_options);

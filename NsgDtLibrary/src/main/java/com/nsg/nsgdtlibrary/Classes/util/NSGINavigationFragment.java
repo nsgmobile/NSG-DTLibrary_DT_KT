@@ -378,12 +378,12 @@ public class NSGINavigationFragment extends Fragment implements View.OnClickList
         change_map_options = (ImageButton)rootView.findViewById(R.id.change_map_options);
         change_map_options.setOnClickListener(NSGINavigationFragment.this);
 
-        dynamic_buffer = (EditText)rootView.findViewById(R.id.dynamic_buffer);
+       // dynamic_buffer = (EditText)rootView.findViewById(R.id.dynamic_buffer);
         // dynamic_buffer.setOnClickListener(NSGINavigationFragment.this);
 
 
-        submit = (Button)rootView.findViewById(R.id.submit);
-        submit.setOnClickListener(NSGINavigationFragment.this);
+       // submit = (Button)rootView.findViewById(R.id.submit);
+       // submit.setOnClickListener(NSGINavigationFragment.this);
 
 
         // Delete Contents fron ROUTE_T On initialisation of Route view
