@@ -3178,7 +3178,7 @@ public class NSGApiActivity extends FragmentActivity implements NSGIMapFragmentA
     private String routeDeviatedDT_URL="http://202.53.11.74/dtnavigation/api/routing/routenavigate";
     String BASE_MAP_URL_FORMAT = Environment.getExternalStorageDirectory() + File.separator + "MBTILES" + File.separator + "DubaiBasemap"+".mbtiles";
     private String AuthorisationKey="\n" +
-            "b3TIz98wORn6daqmthiEu48TAW1ZEQjPuRLapxJPV6HJQiJtO9LsOErPexmDhbZtD76U2AbJ+jXarYr3gAqkkcTQdIZD2yB0yS0HxRBNZ0ZlzbqtIT8INzSTINlwuSvCMGHdvxLqGdNOjixagtRXuQ==";
+            "b3TIz98wORn6daqmthiEu48TAW1ZEQjPuRLapxJPV6HJQiJtO9LsOErPexmDhbZtD76U2AbJ+jXarYr3gAqkkcTQdIZD2yB0yS0HxRBNZ0YOCM4Lg4Z3gFbYvJCEaL/1lueeYHbVIUtB3nJRLtW3tg==";
     String CSVFile_Path= Environment.getExternalStorageDirectory() + File.separator + "MBTILES" + File.separator + "RouteSample"+".txt";
   //  com.nsg.dtlibrary.NavigationProperties properties=new com.nsg.dtlibrary.NavigationProperties();
 
