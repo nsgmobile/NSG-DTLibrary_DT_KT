@@ -1506,7 +1506,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                                 sendData(MapEvents.ALERTVALUE_3, MapEvents.ALERTTYPE_3);
                                                 Log.e("Route Deviation", " Route Deviation Alert POSTED" + MapEvents.ALERTVALUE_3);
                                                 Log.e(" END OF DEV MSG LOG", "ENTERED INTO DEVIATION MSG LOG");
-
+                                                alertDestination(currentGpsPosition);
                                                 // added on 25-04-20 by SKC
                                                 int timeTakenTillNow = (int) (System.currentTimeMillis() - startTimestamp) / 1000;
                                                 if (timeTakenTillNow >= 5) {
