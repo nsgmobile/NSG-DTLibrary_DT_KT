@@ -1847,7 +1847,12 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
             //polygonOptions.fillColor(Color.CYAN);
             isLieInGeofence = false;
             isLieInGeofence = pointWithinPolygon(currentGpsPosition, destinationGeoFenceCoordinatesList);
+            Log.e("Destination Geofence", "Destination Geofence current gpsposition : " + currentGpsPosition);
+            for(int p=0;p<destinationGeoFenceCoordinatesList.size();p++){
+                Log.e("Destination Geofence", "Destination Geofence CordinatesList #### : " + destinationGeoFenceCoordinatesList.get(p));
+            }
             Log.e("Destination Geofence", "Destination Geofence : " + isLieInGeofence);
+
             if (getActivity() != null) {
                 if (isAlertShown == false) {
 
@@ -2376,6 +2381,33 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 mFusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null);
             }
             // Log.v("APP DATA","checking IF ");
+            locationCallback = new LocationCallback() {
+                @Override
+                public void onLocationResult(LocationResult locationResult) {
+                    // if(islocationControlEnabled==false) {
+                    if (locationResult == null) {
+                        return;
+                    }
+                    for (Location location : locationResult.getLocations()) {
+                        if (location != null) {
+
+                            wayLatitude = location.getLatitude();
+                            wayLongitude = location.getLongitude();
+                            if (!isContinue) {
+                                txtLocation.setText(String.format(Locale.US, "%s - %s", wayLatitude, wayLongitude));
+                                //  Log.v("APP DATA", "APP DATA DATA ........ IF " );
+                            } else {
+//                            stringBuilder.append(wayLatitude);
+//                            stringBuilder.append("-");
+//                            stringBuilder.append(wayLongitude);
+//                            stringBuilder.append("\n\n");
+                                currentGPSPosition = new LatLng(wayLatitude, wayLongitude);
+                            }
+                        }
+                    }
+                }
+            };
+
 
 
         } else {
