@@ -2407,6 +2407,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                     }
                 }
             };
+            Log.e("CURRENT GPS ","CURRENT GPS CHANGED ON JAN-09-2021"+currentGPSPosition);
 
 
 
