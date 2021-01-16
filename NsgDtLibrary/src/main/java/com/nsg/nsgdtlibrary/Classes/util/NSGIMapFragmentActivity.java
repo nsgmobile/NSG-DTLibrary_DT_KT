@@ -61,6 +61,7 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MapStyleOptions;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.PolygonOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.maps.model.TileOverlay;
@@ -124,6 +125,7 @@ import static java.lang.Math.sin;
 //import static android.content.Context.LOCATION_SERVICE;
 
 public class NSGIMapFragmentActivity extends Fragment implements View.OnClickListener {
+    private boolean isWriteLogFile=false;
     private boolean isAlertShown = false;
     private static final int PERMISSION_REQUEST_CODE = 200;
     boolean locationAccepted, islocationControlEnabled = false;
@@ -198,9 +200,9 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     private static int CURRENT_ROUTE_WIDTH = 25;
     private static int DEVIATED_ROUTE_WIDTH = 25;
 
-    List<com.nsg.nsgdtlibrary.Classes.util.RouteMessage> messageContainer = new ArrayList<>();
+    List<RouteMessage> messageContainer = new ArrayList<>();
 
-    List<com.nsg.nsgdtlibrary.Classes.util.RouteMessage> messageContainerTemp = new ArrayList<>();
+    List<RouteMessage> messageContainerTemp = new ArrayList<>();
 
     PolylineOptions currentPolylineOptions = new PolylineOptions();
     Polyline currentPolylineGraphics = null;
@@ -234,7 +236,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
     @SuppressLint("ValidFragment")
-    public NSGIMapFragmentActivity(String BASE_MAP_URL_FORMAT, String stNode, String endNode, String routeData, int routeDeviationBuffer, String routeDeviatedDT_URL, String AuthorisationKey, String GeoFenceCordinates) {
+    public NSGIMapFragmentActivity(String BASE_MAP_URL_FORMAT, String stNode, String endNode, String routeData, int routeDeviationBuffer, String routeDeviatedDT_URL, String AuthorisationKey, String GeoFenceCordinates,boolean isWriteLogFile) {
         this.BASE_MAP_URL_FORMAT = BASE_MAP_URL_FORMAT;
         this.stNode = stNode;
         this.endNode = endNode;
@@ -243,6 +245,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         this.routeDeviatedDT_URL = routeDeviatedDT_URL;
         this.AuthorisationKey = AuthorisationKey;
         this.GeoFenceCordinates = GeoFenceCordinates;
+        this.isWriteLogFile=isWriteLogFile;
     }
 
     @Override
@@ -301,7 +304,8 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                         wayLatitude = location.getLatitude();
                         wayLongitude = location.getLongitude();
                         if (!isContinue) {
-                            txtLocation.setText(String.format(Locale.US, "%s - %s", wayLatitude, wayLongitude));
+                            String str = String.format(Locale.US, "%s - %s", wayLatitude, wayLongitude);
+                            txtLocation.setText(str);
                             //  Log.v("APP DATA", "APP DATA DATA ........ IF " );
                         } else {
 //                            stringBuilder.append(wayLatitude);
@@ -324,6 +328,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
             //sqlHandler = new SqlHandler(getContext());// Sqlite handler
             Callback = (FragmentToActivity) context;
         } catch (ClassCastException e) {
+            Log.e("ON ATTACH", e.getMessage(), e);
             throw new ClassCastException(context.toString()
                     + " must implement FragmentToActivity");
         }
@@ -341,7 +346,12 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         mMarkerIcon = BitmapFactory.decodeResource(getResources(), R.drawable.gps_transperent_98);
         //Initialise RootView
         View rootView = inflater.inflate(R.layout.fragment_map, container, false);
-        writeLogFile();
+        //If writeLogFile==true then writing logs on file otherwise we can't write log files on filestorage ---
+        if(isWriteLogFile==true) {
+            writeLogFile();
+        }else{
+
+        }
 
         //Initialise Buttons
 
@@ -859,7 +869,8 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 return 1;
             } catch (Exception e) {
                 e.printStackTrace();
-                return 0;
+                Log.e("START NAVIGATION", e.getMessage(), e);
+                return -1;
             }
         }
         //  }
@@ -895,7 +906,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                         final ImageView image = (ImageView) layout.findViewById(R.id.image_toast);
                         Toast toast = new Toast(getActivity().getApplicationContext());
                         String stopText = "Navigation Stopped";
-                        text.setText("" + stopText);
+                        text.setText(stopText);
                         if (stopText.startsWith("Navigation Stopped")) {
                             image.setImageResource(R.drawable.stop_image);
                         }
@@ -913,9 +924,9 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
             return 1;
         } catch (Exception e) {
-            return 0;
+            Log.e("STOP NAVIGATION", e.getMessage(), e);
+            return -1;
         }
-
     }
 
     public void onDestroy() {
@@ -1134,7 +1145,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         long distanceToTravel = 0l;
 
         LatLng perpendicularPoint = findNearestPointOnLine(currentRouteData, currentPosition);
-        com.nsg.nsgdtlibrary.Classes.util.RouteMessage routeMessage = null;
+        RouteMessage routeMessage = null;
         for (int i = 0; i < messageContainer.size(); i++) {
             routeMessage = messageContainer.get(i);
             if (PolyUtil.isLocationOnPath(perpendicularPoint, routeMessage.getLine(), false)) {
@@ -1625,7 +1636,8 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 if (httpRequestFlag == false) {
                     return HttpPost(routeDeviatedDT_URL, param1, param2);
                 }
-            } catch (Exception ex) {
+            } catch (Exception e) {
+                Log.e("doInBackground", e.getMessage(), e);
             }
             return null;
         }
@@ -1683,13 +1695,13 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
                     currentDeviatedRouteData.addAll(cloneCoordinates(arrayOfCoordinates));
 
-                    messageContainerTemp.add(new com.nsg.nsgdtlibrary.Classes.util.RouteMessage(GeometryText, arrayOfCoordinates));
+                    messageContainerTemp.add(new RouteMessage(GeometryText, arrayOfCoordinates));
                 }
                 removeDuplicatesRouteDeviated(currentDeviatedRouteData);
             }
         } catch (JSONException e) {
             e.printStackTrace();
-            Log.e("GetRouteDetails ", Objects.requireNonNull(e.getMessage()));
+            Log.e("GetRouteDetails ", Objects.requireNonNull(e.getMessage()), e);
         }
 
     }
@@ -1782,8 +1794,9 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                         LatLng newPosition = latLngInterpolator.interpolate(v, startPosition, endPosition);
                         marker.setPosition(newPosition);
                         marker.setRotation(bearing);
-                    } catch (Exception ex) {
+                    } catch (Exception e) {
                         // I don't care atm..
+                        Log.e("animateMarker", e.getMessage(), e);
                     }
                 }
             });
@@ -1842,17 +1855,14 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     public void alertDestination(LatLng currentGpsPosition) {
 
         if (destinationGeoFenceCoordinatesList != null && destinationGeoFenceCoordinatesList.size() > 2) {
-            //PolygonOptions polygonOptions = new PolygonOptions().addAll(DestinationGeoFenceCordinatesList);
-            //mMap.addPolygon(polygonOptions);
-            //polygonOptions.fillColor(Color.CYAN);
+            PolygonOptions polygonOptions = new PolygonOptions().addAll(destinationGeoFenceCoordinatesList);
+            mMap.addPolygon(polygonOptions);
+            polygonOptions.fillColor(Color.CYAN);
             isLieInGeofence = false;
             isLieInGeofence = pointWithinPolygon(currentGpsPosition, destinationGeoFenceCoordinatesList);
-            Log.e("Destination Geofence", "Destination Geofence current gpsposition : " + currentGpsPosition);
-            for(int p=0;p<destinationGeoFenceCoordinatesList.size();p++){
-                Log.e("Destination Geofence", "Destination Geofence CordinatesList #### : " + destinationGeoFenceCoordinatesList.get(p));
-            }
-            Log.e("Destination Geofence", "Destination Geofence : " + isLieInGeofence);
+            Log.e("Destination Geofence", "Destination Geofence Cordinates : " + destinationGeoFenceCoordinatesList);
 
+            Log.e("Destination Geofence", "Destination Geofence : " + isLieInGeofence);
             if (getActivity() != null) {
                 if (isAlertShown == false) {
 
@@ -1869,6 +1879,9 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                         isAlertShown = true;
                         //added by SKC
                         isNavigationStarted = false;
+
+                        //need to clear resources
+
                     } else {
                         //Log.e("AlertDestination", "Alert Destination" + "DESTINATION NOT REACHED--");
                     }
@@ -2108,6 +2121,9 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
             destinationMarker = mMap.addMarker(new MarkerOptions()
                     .position(DestinationNode)
                     .icon(bitmapDescriptorFromVector(getActivity(), R.drawable.destination_marker_whitetext_lightgreen)));
+            Log.e("Source Marker ", "SourceNode Marker : " + SourceNode);
+            Log.e("Destination Marker", "DestinationNode Marker : " + DestinationNode);
+
                /*
                 CameraPosition googlePlex1 = CameraPosition.builder()
                         .target(DestinationNode)
@@ -2250,6 +2266,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 // polyline.setJointType(JointType.ROUND);
             }
         } catch (JSONException e) {
+            Log.e("GetRouteFromDBPlotOnMap", e.getMessage(), e);
             e.printStackTrace();
         }
 
@@ -2381,35 +2398,35 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 mFusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null);
             }
             // Log.v("APP DATA","checking IF ");
-            locationCallback = new LocationCallback() {
+            mFusedLocationClient.getLastLocation().addOnSuccessListener(getActivity(), new OnSuccessListener<Location>() {
                 @Override
-                public void onLocationResult(LocationResult locationResult) {
-                    // if(islocationControlEnabled==false) {
-                    if (locationResult == null) {
-                        return;
-                    }
-                    for (Location location : locationResult.getLocations()) {
-                        if (location != null) {
+                public void onSuccess(Location location) {
+                    //  Log.v("APP DATA","LOCATION NULL");
+                    //   Log.v("APP DATA","checking else ic continue "+isContinue);
+                    if (location != null) {
+                        wayLatitude = location.getLatitude();
+                        wayLongitude = location.getLongitude();
+                        currentGPSPosition = new LatLng(wayLatitude, wayLongitude);
+                        Log.e("LOCATION CALLBACK","LOCATION CALLBACK GET LOCATION METHOD LAT-- 09-JAN-2021"+wayLatitude);
 
-                            wayLatitude = location.getLatitude();
-                            wayLongitude = location.getLongitude();
-                            if (!isContinue) {
-                                txtLocation.setText(String.format(Locale.US, "%s - %s", wayLatitude, wayLongitude));
-                                //  Log.v("APP DATA", "APP DATA DATA ........ IF " );
-                            } else {
-//                            stringBuilder.append(wayLatitude);
-//                            stringBuilder.append("-");
-//                            stringBuilder.append(wayLongitude);
-//                            stringBuilder.append("\n\n");
-                                currentGPSPosition = new LatLng(wayLatitude, wayLongitude);
-                            }
-                        }
+                        Log.e("LOCATION CALLBACK","LOCATION CALLBACK GET LOCATION METHOD LONG-- 09-JAN-2021"+wayLongitude);
+
+                        Log.e("LOCATION CALLBACK","LOCATION CALLBACK GET LOCATION METHOD -- 09-JAN-2021"+currentGPSPosition);
+
+
+                        //just for trail
+                        String S = String.valueOf(location.getLatitude());
+                        // Log.v("APP DATA",""+S);
+                        Log.e("latitude FROM SERVICE",location.getLatitude()+"");
+                        Log.e("longitude FROM SERVICE",location.getLongitude()+"");
+                        //txtLocation.setText(String.format(Locale.US, "%s - %s", wayLatitude, wayLongitude));
+
+                        Log.d("TAG", "location DATA ........" + "CURRENT GPS POSITION : " + wayLatitude + "," + wayLongitude);
+                    } else {
+                        mFusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null);
                     }
                 }
-            };
-            Log.e("CURRENT GPS ","CURRENT GPS CHANGED ON JAN-09-2021"+currentGPSPosition);
-
-
+            });
 
         } else {
             mFusedLocationClient.getLastLocation().addOnSuccessListener(getActivity(), new OnSuccessListener<Location>() {
@@ -2606,6 +2623,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 Process process = Runtime.getRuntime().exec("logcat -c");
                 process = Runtime.getRuntime().exec("logcat -f " + logFile);
             } catch (IOException e) {
+                Log.e("WRITE LOG FILE", e.getMessage(), e);
                 e.printStackTrace();
             }
 
