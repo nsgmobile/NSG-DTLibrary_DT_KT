@@ -847,7 +847,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                             if (mPositionMarker == null) {
 
                                                 mPositionMarker = mMap.addMarker(new MarkerOptions()
-                                                        .position(currentGPSPosition)
+                                                        .position(currentGpsPosition)
                                                         .title("Nearest GpsPoint")
                                                         .anchor(0.5f, 0.5f)
                                                         .flat(true)
