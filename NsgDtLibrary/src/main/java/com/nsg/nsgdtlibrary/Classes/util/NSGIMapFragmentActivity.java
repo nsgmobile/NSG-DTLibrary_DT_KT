@@ -227,7 +227,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         String communicate(String comm, int alertType);
     }
 
-    private FragmentToActivity Callback;
+//    private FragmentToActivity Callback;
 
     public NSGIMapFragmentActivity() {
     }
@@ -258,8 +258,9 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         }
     }
 
+    @SuppressLint("MissingPermission")
     private void startLocationUpdates() {
-        Log.e("Coming to ","startLocationUpdates ##### " + isContinue);
+        Log.e("Coming to ", "startLocationUpdates ##### " + isContinue);
         if (isContinue) {
 
             mFusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null);
@@ -393,14 +394,14 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
-        try {
-            //sqlHandler = new SqlHandler(getContext());// Sqlite handler
-            Callback = (FragmentToActivity) context;
-        } catch (ClassCastException e) {
-            Log.e("ON ATTACH", e.getMessage(), e);
-            throw new ClassCastException(context.toString()
-                    + " must implement FragmentToActivity");
-        }
+//        try {
+//            //sqlHandler = new SqlHandler(getContext());// Sqlite handler
+//            Callback = (FragmentToActivity) context;
+//        } catch (ClassCastException e) {
+//            Log.e("ON ATTACH", e.getMessage(), e);
+//            throw new ClassCastException(context.toString()
+//                    + " must implement FragmentToActivity");
+//        }
     }
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
@@ -508,6 +509,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         return rootView;
     }
 
+    @SuppressLint("MissingPermission")
     @Override
     public void onClick(View v) {
         if (v == change_map_options) {
@@ -580,6 +582,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
     //Main method to start the navigation
+    @SuppressLint("MissingPermission")
     public int startNavigation() {
             /*
                 Starts Navigation HERE
@@ -587,6 +590,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 from external service and strts navigation if route deviation not observed move in the loaded path
                 if route deviation observed movement from route deviated path only
              */
+
         islocationControlEnabled = false;
         Log.v("APP DATA ", "islocationControlEnabled START BUTTON GPS POSITION ----" + oldGPSPosition);
 
@@ -614,7 +618,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
                     //To enable Direction text for every 8000ms
 //                    if (isTimerStarted = true) {
-
+                    isLieInGeofence = false;
                     if( myTimer == null) {
                         myTimer = new Timer();
                     }
@@ -940,6 +944,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                 if(isNavigationStarted) {
                                     handler.postDelayed(this, delay);
                                 } else {
+                                    handler.removeCallbacks(this);
                                     if( myTimer != null) {
                                         myTimer.cancel();
                                         myTimer = null;
@@ -1909,37 +1914,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         return points;
     }
 
-    public void isReachedDestination_NotUsing(LatLng currentPosition, LatLng destinationPoint) {
-
-        if (destinationGeoFenceCoordinatesList != null && destinationGeoFenceCoordinatesList.size() > 2) {
-            //PolygonOptions polygonOptions = new PolygonOptions().addAll(DestinationGeoFenceCordinatesList);
-            //mMap.addPolygon(polygonOptions);
-            //polygonOptions.fillColor(Color.CYAN);
-            isLieInGeofence = (SphericalUtil.computeDistanceBetween(currentPosition, destinationPoint) < 5.1);
-            Log.e("Destination Geofence", "Destination Geofence : " + isLieInGeofence);
-            if (getActivity() != null) {
-                if (isAlertShown == false) {
-                    if (isLieInGeofence == true) {
-
-                        String data1 = " Your Destination Reached ";
-                        int speechStatus1 = textToSpeech.speak(data1, TextToSpeech.QUEUE_FLUSH, null);
-                        if (speechStatus1 == TextToSpeech.ERROR) {
-                            Log.e("TTS", "Error in converting Text to Speech!");
-                        }
-                        sendData(MapEvents.ALERTVALUE_4, MapEvents.ALERTTYPE_4);
-
-                        Log.e("AlertDestination", "Alert Destination" + "DESTINATION REACHED--");
-                        isAlertShown = true;
-                    } else {
-                        //Log.e("AlertDestination", "Alert Destination" + "DESTINATION NOT REACHED--");
-                    }
-                } else {
-
-                }
-            }
-        }
-    }
-
     public void alertDestination(LatLng currentGpsPosition) {
 
         if (destinationGeoFenceCoordinatesList != null && destinationGeoFenceCoordinatesList.size() > 2) {
@@ -1991,10 +1965,13 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
     private void sendData(String comm, int AlertType) {
+
+        FragmentToActivity callback = (FragmentToActivity)getActivity();
+
         //comm=time.toString();
         if (comm != null) {
             //  Log.e("SendData", "SendData ------- " + comm + "AlertType" + AlertType);
-            Callback.communicate(comm, AlertType);
+            callback.communicate(comm, AlertType);
         } else {
 
         }
@@ -2479,6 +2456,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
 
+    @SuppressLint("MissingPermission")
     private LatLng getLocation() {
 
         if (isContinue) {
@@ -2566,6 +2544,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
     private void animateCarMove(final Marker marker, final LatLng beginLatLng, final LatLng endLatLng, final long duration) {
         final Handler handler = new Handler();
+
         final long startTime = SystemClock.uptimeMillis();
         final Interpolator interpolator = new LinearInterpolator();
         // set car bearing for current part of path
@@ -2579,6 +2558,14 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
             @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
             @Override
             public void run() {
+
+                if(isLieInGeofence) {
+                    Log.e("Animate marker","Animate marker destination alert in if "+ isLieInGeofence);
+                    handler.removeCallbacks(this);
+                }else {
+                    Log.e("Animate marker", "Animate marker destination alert in else" + isLieInGeofence);
+                }
+
                 // calculate phase of animation
                 long elapsed = SystemClock.uptimeMillis() - startTime;
                 float t = interpolator.getInterpolation((float) elapsed / duration);
