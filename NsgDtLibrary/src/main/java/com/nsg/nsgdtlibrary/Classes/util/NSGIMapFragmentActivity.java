@@ -223,6 +223,8 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
     private LatLng nearlyFirstGPSPosition = null;
 
+    private boolean isFragmentDestroyed = false;
+
     public interface FragmentToActivity {
         String communicate(String comm, int alertType);
     }
@@ -300,7 +302,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
-        mLocationManager = (LocationManager) getActivity().getSystemService(LOCATION_SERVICE);
+        //mLocationManager = (LocationManager) getActivity().getSystemService(LOCATION_SERVICE);
         if (savedInstanceState == null) {
             textToSpeech = new TextToSpeech(getContext(), new TextToSpeech.OnInitListener() {
                 @Override
@@ -941,7 +943,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                // Log.e("RECALL", "Re calling Location trigger method on 19 jan 2021 : " );
 
                                 //if the navigation is active then only make a recursive call
-                                if(isNavigationStarted) {
+                                if(isNavigationStarted && isFragmentDestroyed == false) {
                                     handler.postDelayed(this, delay);
                                 } else {
                                     handler.removeCallbacks(this);
@@ -1022,16 +1024,37 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         }
     }
 
+    @Override
     public void onDestroy() {
         super.onDestroy();
+        isFragmentDestroyed = true;
         if (textToSpeech != null) {
             textToSpeech.shutdown();
+            textToSpeech = null;
         }
         if (mFusedLocationClient != null) {
+            stopLocationUpdates();
             mFusedLocationClient = null;
         }
+        locationRequest = null;
+        locationCallback = null;
     }
 
+    @Override
+    public void onDestroyView() {
+        super.onDestroyView();
+//        isFragmentDestroyed = true;
+//        if (textToSpeech != null) {
+//            textToSpeech.shutdown();
+//            textToSpeech = null;
+//        }
+//        if (mFusedLocationClient != null) {
+//            stopLocationUpdates();
+//            mFusedLocationClient = null;
+//        }
+//        locationRequest = null;
+//        locationCallback = null;
+    }
 
     @Override
     public void onDetach() {
@@ -1968,13 +1991,17 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
         FragmentToActivity callback = (FragmentToActivity)getActivity();
 
-        //comm=time.toString();
-        if (comm != null) {
-            //  Log.e("SendData", "SendData ------- " + comm + "AlertType" + AlertType);
-            callback.communicate(comm, AlertType);
-        } else {
+        if(callback != null) {
+            //comm=time.toString();
+            if (comm != null) {
+                //  Log.e("SendData", "SendData ------- " + comm + "AlertType" + AlertType);
+                callback.communicate(comm, AlertType);
+            } else {
 
+            }
         }
+
+
 
     }
 
@@ -2559,7 +2586,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
             @Override
             public void run() {
 
-                if(isLieInGeofence) {
+                if(isLieInGeofence || isFragmentDestroyed) {
                     Log.e("Animate marker","Animate marker destination alert in if "+ isLieInGeofence);
                     handler.removeCallbacks(this);
                 }else {
