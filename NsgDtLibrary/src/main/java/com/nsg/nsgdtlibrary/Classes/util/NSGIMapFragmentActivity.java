@@ -5,9 +5,13 @@ import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
+import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -23,6 +27,7 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Looper;
 import android.os.SystemClock;
 import android.speech.tts.TextToSpeech;
@@ -67,7 +72,9 @@ import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.maps.model.TileOverlay;
 import com.google.android.gms.maps.model.TileOverlayOptions;
 import com.google.android.gms.maps.model.TileProvider;
+import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+import com.google.android.gms.tasks.Task;
 import com.google.maps.android.PolyUtil;
 import com.google.maps.android.SphericalUtil;
 import com.nsg.nsgdtlibrary.Classes.activities.AppConstants;
@@ -109,6 +116,7 @@ import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import static android.Manifest.permission.ACCESS_FINE_LOCATION;
 import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
@@ -225,6 +233,58 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
     private boolean isFragmentDestroyed = false;
 
+    //-- new change start
+
+    // The BroadcastReceiver used to listen from broadcasts from the service.
+    private MyReceiver myReceiver;
+
+    // A reference to the service used to get location updates.
+    private LocationUpdatesService mService = null;
+
+    // Tracks the bound state of the service.
+    private boolean mBound = false;
+
+    // Monitors the state of the connection to the service.
+    private final ServiceConnection mServiceConnection = new ServiceConnection() {
+
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+
+            Log.i("service bind", "success");
+
+            LocationUpdatesService.LocalBinder binder = (LocationUpdatesService.LocalBinder) service;
+            mService = binder.getService();
+            mBound = true;
+            mService.requestLocationUpdates();
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            Log.i("service unbind", "success");
+            mService.removeLocationUpdates();
+            mService = null;
+            mBound = false;
+        }
+    };
+
+    /**
+     * Receiver for broadcasts sent by {@link LocationUpdatesService}.
+     */
+    private class MyReceiver extends BroadcastReceiver {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Location location = intent.getParcelableExtra(LocationUpdatesService.EXTRA_LOCATION);
+            if (location != null) {
+                Log.e("myreceiver", Utils.getLocationText(location));
+                lastGPSPosition = new LatLng(location.getLatitude(), location.getLongitude());
+//                Toast.makeText(getContext(), Utils.getLocationText(location),
+//                        Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
+
+    //-- new change end
+
     public interface FragmentToActivity {
         String communicate(String comm, int alertType);
     }
@@ -253,6 +313,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
     private LatLng getLastGPSPosition() {
+
         if (lastGPSPosition == null) {
             return null;
         } else {
@@ -263,14 +324,12 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     @SuppressLint("MissingPermission")
     private void startLocationUpdates() {
         Log.e("Coming to ", "startLocationUpdates ##### " + isContinue);
-        if (isContinue) {
 
-            mFusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null);
-        }
     }
 
     private void stopLocationUpdates() {
-        mFusedLocationClient.removeLocationUpdates(locationCallback);
+
+        //mService.removeLocationUpdates();
     }
 
     @Override
@@ -279,29 +338,52 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         if (isContinue) {
             startLocationUpdates();
         }
+
+        LocalBroadcastManager.getInstance(getContext()).registerReceiver(myReceiver,
+                new IntentFilter(LocationUpdatesService.ACTION_BROADCAST));
     }
 
     @Override
     public void onPause() {
         super.onPause();
         stopLocationUpdates();
+
+        LocalBroadcastManager.getInstance(getContext()).unregisterReceiver(myReceiver);
     }
 
     @Override
     public void onStart() {
+
+        getContext().bindService(new Intent(getContext(), LocationUpdatesService.class), mServiceConnection,
+                Context.BIND_AUTO_CREATE);
+
         super.onStart();
+        if (isContinue) {
+            startLocationUpdates();
+        }
     }
 
     @Override
     public void onStop() {
         super.onStop();
         stopLocationUpdates();
+        if (mBound) {
+            // Unbind from the service. This signals to the service that this activity is no longer
+            // in the foreground, and the service can respond by promoting itself to a foreground
+            // service.
+            getContext().unbindService(mServiceConnection);
+            mBound = false;
+        }
     }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
+
+        myReceiver = new MyReceiver();
+        Log.e("MY RECIEVER","MY RECIEVER ----- "+myReceiver);
+
         //mLocationManager = (LocationManager) getActivity().getSystemService(LOCATION_SERVICE);
         if (savedInstanceState == null) {
             textToSpeech = new TextToSpeech(getContext(), new TextToSpeech.OnInitListener() {
@@ -323,16 +405,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
             });
         }
 
-        //Initialise Fused Location Client
-        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(getActivity());
-        //Initialise Location Listener
-        locationRequest = LocationRequest.create();
-        //Initialise Accuracy
-        locationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
-        //Initialise interval
-         locationRequest.setInterval(1 * 1000); // 1 seconds
-        // locationRequest.setFastestInterval(5 * 1000); // 5 seconds
-
         new GpsUtils(getContext()).turnGPSOn(new GpsUtils.onGpsListener() {
             @Override
             public void gpsStatus(boolean isGPSEnable) {
@@ -341,56 +413,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
             }
         });
 
-        locationCallback = new LocationCallback() {
-            @Override
-            public void onLocationResult(LocationResult locationResult) {
-                Log.e("Coming to ","Location Callback on 19 jan 2021 ##### ");
-
-                if (locationResult == null) {
-                    return;
-                }
-                Location tmplocation = locationResult.getLastLocation();
-                if( tmplocation != null) {
-                    lastGPSPosition = new LatLng(tmplocation.getLatitude(), tmplocation.getLongitude());
-                }
-//                for (Location location : locationResult.getLocations()) {
-//                    lastGPSPosition = new LatLng(location.getLatitude(), location.getLongitude());
-//                }
-                Log.e("Coming to ","Location Callback on 19 jan 2021 ##### "+lastGPSPosition);
-
-            }
-        };
-
-        //getLocation callback Method for get location
-        /*locationCallback = new LocationCallback() {
-            @Override
-            public void onLocationResult(LocationResult locationResult) {
-                // if(islocationControlEnabled==false) {
-                if (locationResult == null) {
-                    return;
-                }
-                for (Location location : locationResult.getLocations()) {
-                    if (location != null) {
-
-                        wayLatitude = location.getLatitude();
-                        wayLongitude = location.getLongitude();
-                        if (!isContinue) {
-                            String str = String.format(Locale.US, "%s - %s", wayLatitude, wayLongitude);
-                            txtLocation.setText(str);
-                            //  Log.v("APP DATA", "APP DATA DATA ........ IF " );
-                        } else {
-//                            stringBuilder.append(wayLatitude);
-//                            stringBuilder.append("-");
-//                            stringBuilder.append(wayLongitude);
-//                            stringBuilder.append("\n\n");
-                            currentGPSPosition = new LatLng(wayLatitude, wayLongitude);
-                        }
-                    }
-                }
-            }
-        };*/
-        // writeLogFile();
-        startLocationUpdates();
     }
 
     @Override
@@ -518,7 +540,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 /*
                 Changing Map options on button click To MAP_TYPE_NORMAL,MAP_TYPE_SATELLITE,MAP_TYPE_TERRAIN,MAP_TYPE_HYBRID
                  */
-
             PopupMenu popup = new PopupMenu(getContext(), change_map_options);
             //Inflating the Popup using xml file
             popup.getMenuInflater()
@@ -599,7 +620,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
         if (SourceNode != null && DestinationNode != null) {
 
-            startLocationUpdates();
             //estimate the projected travelling time
             setEstimatedTime(currentRouteData);
 
@@ -683,8 +703,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                     //BY DEFAULT true
                     isNavigationStarted = true;
 
-                   // startLocationUpdates();
-
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
 //                        isTimerStarted = true;
                         Handler handler = new Handler();
@@ -695,6 +713,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                         handler.postDelayed(new Runnable() {
                             public void run() {
                                 double returnedDistance_ref = 0.0;
+
 
                                 if (currentGpsPosition != null) {
                                     oldGPSPosition = currentGpsPosition;
@@ -939,7 +958,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
                                 }
 
-                                //startLocationUpdates();
+
                                // Log.e("RECALL", "Re calling Location trigger method on 19 jan 2021 : " );
 
                                 //if the navigation is active then only make a recursive call
@@ -971,6 +990,21 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         return 0;
     }
 
+    @SuppressLint("MissingPermission")
+    private void saveLocation() {
+        //getting location
+        if(mFusedLocationClient == null) return;
+
+        mFusedLocationClient.getLastLocation().addOnSuccessListener(getActivity(), new OnSuccessListener<Location>() {
+            @Override
+            public void onSuccess(Location location) {
+                if (location != null) {
+                    lastGPSPosition = new LatLng(location.getLatitude(), location.getLongitude());
+                }
+            }
+        });
+    }
+
     public int stopNavigation() {
             /*
               StopNavigation if user enables stop navigation
@@ -990,7 +1024,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 //                        mFusedLocationClient.removeLocationUpdates(locationCallback);
 //                        //  Log.e("STOP NAVIGATION", "STOP NAVIGATION");
 //                    }
-                    stopLocationUpdates();
+
                     if (currentGpsPosition != null) {
                         // String NavigationAlert = " Navigation Stopped " ;
                         String NavigationAlert = " Navigation Stopped " + currentGpsPosition;
@@ -1032,22 +1066,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
             textToSpeech.shutdown();
             textToSpeech = null;
         }
-        if (mFusedLocationClient != null) {
-            stopLocationUpdates();
-            mFusedLocationClient = null;
-        }
-        locationRequest = null;
-        locationCallback = null;
-    }
-
-    @Override
-    public void onDestroyView() {
-        super.onDestroyView();
-//        isFragmentDestroyed = true;
-//        if (textToSpeech != null) {
-//            textToSpeech.shutdown();
-//            textToSpeech = null;
-//        }
+        myReceiver=null;
 //        if (mFusedLocationClient != null) {
 //            stopLocationUpdates();
 //            mFusedLocationClient = null;
@@ -1055,6 +1074,8 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 //        locationRequest = null;
 //        locationCallback = null;
     }
+
+
 
     @Override
     public void onDetach() {
@@ -1474,11 +1495,11 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         // add the new route coordinates
         mergedRoute.addAll(cloneCoordinates(newRoute));
 
-        Log.e("MERGE_ROUTE", "oldRoute " + reverseCoordinates(oldRoute).toString());
-        Log.e("MERGE_ROUTE", "newRoute " + reverseCoordinates(newRoute).toString());
-        Log.e("MERGE_ROUTE", "deviationPoint " + reverseCoordinate(deviationPoint).toString());
-        Log.e("MERGE_ROUTE", "perpendicularPoint " + reverseCoordinate(perpendicularPoint).toString());
-        Log.e("MERGE_ROUTE", "mergedRoute " + reverseCoordinates(mergedRoute).toString());
+//        Log.e("MERGE_ROUTE", "oldRoute " + reverseCoordinates(oldRoute).toString());
+//        Log.e("MERGE_ROUTE", "newRoute " + reverseCoordinates(newRoute).toString());
+//        Log.e("MERGE_ROUTE", "deviationPoint " + reverseCoordinate(deviationPoint).toString());
+//        Log.e("MERGE_ROUTE", "perpendicularPoint " + reverseCoordinate(perpendicularPoint).toString());
+//        Log.e("MERGE_ROUTE", "mergedRoute " + reverseCoordinates(mergedRoute).toString());
 
         return mergedRoute;
     }
