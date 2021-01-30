@@ -5,7 +5,6 @@ import android.animation.ValueAnimator;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.content.BroadcastReceiver;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -20,7 +19,6 @@ import android.graphics.Matrix;
 import android.graphics.Point;
 import android.location.Location;
 import android.location.LocationManager;
-import android.os.AsyncTask;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
@@ -37,16 +35,12 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.animation.Interpolator;
 import android.view.animation.LinearInterpolator;
-import android.widget.Button;
-import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import android.view.animation.Interpolator;
-import android.view.animation.LinearInterpolator;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
@@ -54,9 +48,6 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import com.google.android.gms.location.FusedLocationProviderClient;
-import com.google.android.gms.location.LocationCallback;
-import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
@@ -74,7 +65,6 @@ import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.maps.model.TileOverlay;
 import com.google.android.gms.maps.model.TileOverlayOptions;
 import com.google.android.gms.maps.model.TileProvider;
-import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.maps.android.PolyUtil;
 import com.google.maps.android.SphericalUtil;
 import com.nsg.nsgdtlibrary.Classes.activities.AppConstants;
@@ -91,7 +81,6 @@ import org.json.JSONObject;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
@@ -100,7 +89,6 @@ import java.util.TimerTask;
 
 import static android.Manifest.permission.ACCESS_FINE_LOCATION;
 import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
-import static com.nsg.nsgdtlibrary.Classes.util.Utils.HttpPost;
 import static com.nsg.nsgdtlibrary.Classes.util.Utils.bearingBetweenLocations;
 import static com.nsg.nsgdtlibrary.Classes.util.Utils.bitmapDescriptorFromVector;
 import static com.nsg.nsgdtlibrary.Classes.util.Utils.calculateDistanceAlongLineFromStart;
@@ -119,19 +107,13 @@ import static com.nsg.nsgdtlibrary.Classes.util.Utils.setEstimatedTime;
 import static com.nsg.nsgdtlibrary.Classes.util.Utils.showDistance;
 import static com.nsg.nsgdtlibrary.Classes.util.Utils.splitLineByPoint;
 
-//import com.google.android.gms.location.LocationListener;
-//import static android.Manifest.permission.ACCESS_FINE_LOCATION;
-//import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
-//import static android.content.Context.LOCATION_SERVICE;
-
 public class NSGIMapFragmentActivity extends Fragment implements View.OnClickListener {
     private boolean isWriteLogFile = false;
     private boolean isAlertShown = false;
     private static final int PERMISSION_REQUEST_CODE = 200;
     boolean locationAccepted, islocationControlEnabled = false;
     // private static final int SENSOR_DELAY_NORMAL =50;
-    boolean isTimerStarted = false;
-    private TextToSpeech textToSpeech;
+    private TextToSpeech textToSpeech = null;
 
     // do not use this directly
     LatLng lastGPSPosition = null;
@@ -151,9 +133,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     private List<LatLng> currentDeviatedRouteData = new ArrayList<>();
     private List<LatLng> deviatedRouteData = new ArrayList<>();
 
-    HashMap<String, String> AllPointEdgeNo;
-    HashMap<String, String> AllPointEdgeDistaces;
-    private LatLng PointData;
     private List<LatLng> nearestPointValuesList;
     private ImageButton change_map_options, re_center;
     private List<LatLng> OldNearestGpsList;
@@ -164,22 +143,12 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     Timer myTimer = null;
     private String stNode, endNode, routeDeviatedDT_URL = "", AuthorisationKey;
     double TotalDistanceInMTS;
-    private List<EdgeDataT> EdgeContainsDataList;
-    StringBuilder time = new StringBuilder();
     LatLng currentPerpendicularPoint = null;
     private String routeData;
     public boolean isMapLoaded = false;
     public boolean isNavigationStarted = false;
-    LocationManager mLocationManager;
 
-    private TextView txtLocation;
-
-    private FusedLocationProviderClient mFusedLocationClient;
     private double wayLatitude = 0.0, wayLongitude = 0.0;
-    private LocationRequest locationRequest;
-    private LocationCallback locationCallback;
-    private StringBuilder stringBuilder;
-    LatLng currentGPSPosition;
     private boolean isContinue = true;
     private String GeoFenceCordinates;
     private boolean routeAPIHit = false;
@@ -191,9 +160,8 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     List<LatLng> destinationGeoFenceCoordinatesList;
     private boolean isLieInGeofence = false;
     private boolean isContinuoslyOutOfTrack = false;
-    boolean httpRequestFlag = false;
-    private EditText dynamic_changeValue;
-    private Button submit;
+//    private EditText dynamic_changeValue;
+//    private Button submit;
 
     long startTimestamp;
     int estimatedRemainingTime = 0;
@@ -230,10 +198,10 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     //-- new change start
 
     // The BroadcastReceiver used to listen from broadcasts from the service.
-    private MyReceiver myReceiver;
+    private LocationReceiver myReceiver;
 
     // A reference to the service used to get location updates.
-    private LocationUpdatesService mService = null;
+    private LocationUpdatesService locationUpdatesService = null;
 
     // Tracks the bound state of the service.
     private boolean mBound = false;
@@ -247,35 +215,23 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
             Log.i("service bind", "success");
 
             LocationUpdatesService.LocalBinder binder = (LocationUpdatesService.LocalBinder) service;
-            mService = binder.getService();
+            locationUpdatesService = binder.getService();
             mBound = true;
-            mService.requestLocationUpdates();
+            locationUpdatesService.requestLocationUpdates();
         }
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
             Log.i("service unbind", "success");
-            mService.removeLocationUpdates();
-            mService = null;
+            locationUpdatesService.removeLocationUpdates();
+            locationUpdatesService = null;
             mBound = false;
         }
     };
+    private SupportMapFragment mapFragment;
+    private AsyncResponse asyncResponse;
 
-    /**
-     * Receiver for broadcasts sent by {@link LocationUpdatesService}.
-     */
-    private class MyReceiver extends BroadcastReceiver {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            Location location = intent.getParcelableExtra(LocationUpdatesService.EXTRA_LOCATION);
-            if (location != null) {
-                Log.e("myreceiver", Utils.getLocationText(location));
-                lastGPSPosition = new LatLng(location.getLatitude(), location.getLongitude());
-//                Toast.makeText(getContext(), Utils.getLocationText(location),
-//                        Toast.LENGTH_SHORT).show();
-            }
-        }
-    }
+
 
     //-- new change end
 
@@ -289,12 +245,8 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
     @SuppressLint("ValidFragment")
-    private NSGIMapFragmentActivity(String BASE_MAP_URL_FORMAT) {
+    public NSGIMapFragmentActivity(String BASE_MAP_URL_FORMAT) {
         this.BASE_MAP_URL_FORMAT = BASE_MAP_URL_FORMAT;
-    }
-
-    public static NSGIMapFragmentActivity getInstance(String BASE_MAP_URL_FORMAT) {
-        return new NSGIMapFragmentActivity(BASE_MAP_URL_FORMAT);
     }
 
     public static NSGIMapFragmentActivity getInstance(String BASE_MAP_URL_FORMAT, String stNode, String endNode, String routeData, int routeDeviationBuffer, String routeDeviatedDT_URL, String AuthorisationKey, String geoFenceCoordinates, boolean isWriteLogFile) {
@@ -302,7 +254,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
     @SuppressLint("ValidFragment")
-    private NSGIMapFragmentActivity(String BASE_MAP_URL_FORMAT, String stNode, String endNode, String routeData, int routeDeviationBuffer, String routeDeviatedDT_URL, String AuthorisationKey, String GeoFenceCordinates, boolean isWriteLogFile) {
+    public NSGIMapFragmentActivity(String BASE_MAP_URL_FORMAT, String stNode, String endNode, String routeData, int routeDeviationBuffer, String routeDeviatedDT_URL, String AuthorisationKey, String GeoFenceCordinates, boolean isWriteLogFile) {
         this.BASE_MAP_URL_FORMAT = BASE_MAP_URL_FORMAT;
         this.stNode = stNode;
         this.endNode = endNode;
@@ -323,35 +275,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         }
     }
 
-    @SuppressLint("MissingPermission")
-    private void startLocationUpdates() {
-        Log.e("Coming to ", "startLocationUpdates ##### " + isContinue);
-
-    }
-
-    private void stopLocationUpdates() {
-
-        //mService.removeLocationUpdates();
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        if (isContinue) {
-            startLocationUpdates();
-        }
-
-        LocalBroadcastManager.getInstance(getContext()).registerReceiver(myReceiver,
-                new IntentFilter(LocationUpdatesService.ACTION_BROADCAST));
-    }
-
-    @Override
-    public void onPause() {
-        super.onPause();
-        stopLocationUpdates();
-
-        LocalBroadcastManager.getInstance(getContext()).unregisterReceiver(myReceiver);
-    }
 
     @Override
     public void onStart() {
@@ -360,15 +283,11 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 Context.BIND_AUTO_CREATE);
 
         super.onStart();
-        if (isContinue) {
-            startLocationUpdates();
-        }
     }
 
     @Override
     public void onStop() {
         super.onStop();
-        stopLocationUpdates();
         if (mBound) {
             // Unbind from the service. This signals to the service that this activity is no longer
             // in the foreground, and the service can respond by promoting itself to a foreground
@@ -379,33 +298,45 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
     @Override
+    public void onResume() {
+        super.onResume();
+        LocalBroadcastManager.getInstance(getContext()).registerReceiver(myReceiver,
+                new IntentFilter(LocationUpdatesService.ACTION_BROADCAST));
+//        locationUpdatesService.requestLocationUpdates();
+    }
+
+    @Override
+    public void onPause() {
+        LocalBroadcastManager.getInstance(getContext()).unregisterReceiver(myReceiver);
+//        locationUpdatesService.removeLocationUpdates();
+        super.onPause();
+    }
+
+    @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
 
-        myReceiver = new MyReceiver();
-        Log.e("MY RECIEVER","MY RECIEVER ----- "+myReceiver);
+        myReceiver = new LocationReceiver(this);
 
         //mLocationManager = (LocationManager) getActivity().getSystemService(LOCATION_SERVICE);
-        if (savedInstanceState == null) {
-            textToSpeech = new TextToSpeech(getContext(), new TextToSpeech.OnInitListener() {
-                @Override
-                public void onInit(int status) {
-                    if (status == TextToSpeech.SUCCESS) {
-                        int ttsLang = textToSpeech.setLanguage(Locale.US);
-                        if (ttsLang == TextToSpeech.LANG_MISSING_DATA
-                                || ttsLang == TextToSpeech.LANG_NOT_SUPPORTED) {
-                            Log.e("TTS", "The Language is not supported!");
-                        } else {
-                            Log.i("TTS", "Language Supported.");
-                        }
-                        Log.i("TTS", "Initialization success.");
+        textToSpeech = new TextToSpeech(getContext(), new TextToSpeech.OnInitListener() {
+            @Override
+            public void onInit(int status) {
+                if (status == TextToSpeech.SUCCESS) {
+                    int ttsLang = textToSpeech.setLanguage(Locale.US);
+                    if (ttsLang == TextToSpeech.LANG_MISSING_DATA
+                            || ttsLang == TextToSpeech.LANG_NOT_SUPPORTED) {
+                        Log.e("TTS", "The Language is not supported!");
                     } else {
-                        Toast.makeText(getContext(), "TTS Initialization failed!", Toast.LENGTH_SHORT).show();
+                        Log.i("TTS", "Language Supported.");
                     }
+                    Log.i("TTS", "Initialization success.");
+                } else {
+                    Toast.makeText(getContext(), "TTS Initialization failed!", Toast.LENGTH_SHORT).show();
                 }
-            });
-        }
+            }
+        });
 
         new GpsUtils(getContext()).turnGPSOn(new GpsUtils.onGpsListener() {
             @Override
@@ -430,6 +361,33 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 //        }
     }
 
+    @Override
+    public void onDestroyView() {
+
+        mMarkerIcon = null;
+
+        re_center.setOnClickListener(null);
+        re_center = null;
+
+        change_map_options.setOnClickListener(null);
+        change_map_options = null;
+
+        mapFragment.onDestroyView();
+        mapFragment.onDestroy();
+        mapFragment = null;
+
+        sourceMarker.remove();
+        sourceMarker = null;
+        destinationMarker.remove();
+        destinationMarker = null;
+
+        mMap.clear();
+        mMap = null;
+        mPositionMarker = null;
+
+        super.onDestroyView();
+    }
+
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
@@ -444,10 +402,8 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         //Initialise RootView
         View rootView = inflater.inflate(R.layout.fragment_map, container, false);
         //If writeLogFile==true then writing logs on file otherwise we can't write log files on filestorage ---
-        if(isWriteLogFile==true) {
+        if(isWriteLogFile) {
             writeLogFile();
-        }else{
-
         }
 
         //Initialise Buttons
@@ -480,7 +436,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 //            }
 //        }
         //Initialise Map fragment
-        SupportMapFragment mapFragment = (SupportMapFragment) getChildFragmentManager().findFragmentById(R.id.frg);  //use SuppoprtMapFragment for using in fragment instead of activity  MapFragment1 = activity   SupportMapFragment = fragment
+        mapFragment = (SupportMapFragment) getChildFragmentManager().findFragmentById(R.id.frg);  //use SuppoprtMapFragment for using in fragment instead of activity  MapFragment1 = activity   SupportMapFragment = fragment
         mapFragment.getMapAsync(new OnMapReadyCallback() {
             @Override
             public void onMapReady(GoogleMap googlemap) {
@@ -596,15 +552,17 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 mMap.moveCamera(CameraUpdateFactory.newLatLng(myLocation));
                 mMap.animateCamera(CameraUpdateFactory.zoomTo(18));
             }
-        } else if (v == submit) {
-            if (!dynamic_changeValue.getText().toString().isEmpty()) {
-                int val = Integer.parseInt(dynamic_changeValue.getText().toString());
-                routeDeviationDistance = val;
-                Log.e("Route Deviation Buffer", " Deviation Buffer Test---- " + routeDeviationDistance);
-            } else {
-                routeDeviationDistance = 10;
-            }
         }
+
+//        else if (v.equals(submit)) {
+//            if (!dynamic_changeValue.getText().toString().isEmpty()) {
+//                int val = Integer.parseInt(dynamic_changeValue.getText().toString());
+//                routeDeviationDistance = val;
+//                Log.e("Route Deviation Buffer", " Deviation Buffer Test---- " + routeDeviationDistance);
+//            } else {
+//                routeDeviationDistance = 10;
+//            }
+//        }
     }
 
     //Main method to start the navigation
@@ -642,7 +600,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 if (mMap != null && isMapLoaded && !isNavigationStarted) {
 
                     //To enable Direction text for every 8000ms
-//                    if (isTimerStarted = true) {
                     isLieInGeofence = false;
                     if( myTimer == null) {
                         myTimer = new Timer();
@@ -707,7 +664,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                     isNavigationStarted = true;
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-//                        isTimerStarted = true;
                         Handler handler = new Handler();
 
                         //Get Location for every 1000 ms
@@ -728,7 +684,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
                                 consDistList.add(returnedDistance_ref);
                                 isContinue = true;
-                                stringBuilder = new StringBuilder();
 
                                 currentGpsPosition = getLastGPSPosition();
 
@@ -994,18 +949,10 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
     @SuppressLint("MissingPermission")
-    private void saveLocation() {
-        //getting location
-        if(mFusedLocationClient == null) return;
-
-        mFusedLocationClient.getLastLocation().addOnSuccessListener(getActivity(), new OnSuccessListener<Location>() {
-            @Override
-            public void onSuccess(Location location) {
-                if (location != null) {
-                    lastGPSPosition = new LatLng(location.getLatitude(), location.getLongitude());
-                }
-            }
-        });
+    void saveLocation(LatLng location) {
+        if(location != null) {
+            lastGPSPosition = new LatLng(location.latitude, location.longitude);
+        }
     }
 
     public int stopNavigation() {
@@ -1016,7 +963,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         try {
             islocationControlEnabled = true;
             if (SourceNode != null && DestinationNode != null) {
-                if (mMap != null && isNavigationStarted) {
+                if (mMap != null && isNavigationStarted && islocationControlEnabled) {
                     isNavigationStarted = false;
                     islocationControlEnabled = false;
                     //  Log.e("STOP NAVIGATION", "STOP NAVIGATION INNER VALUE --"+ islocationControlEnabled);
@@ -1061,23 +1008,76 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         }
     }
 
+    private void deinitialize(List<?> v) {
+        if(v != null) {
+            v.clear();
+        }
+        v = null;
+    }
+
     @Override
     public void onDestroy() {
+        Log.e("onDestroy","NSGIMapFragmentActivity");
 
         isFragmentDestroyed = true;
         if (textToSpeech != null) {
+            textToSpeech.stop();
             textToSpeech.shutdown();
-            textToSpeech = null;
         }
+        textToSpeech = null;
+
+        myReceiver.releaseReference();
         myReceiver = null;
+
+        asyncResponse = null;
+
+        lastGPSPosition = null;
+
+        oldGPSPosition = null;
+        deinitialize(points);
+        deinitialize(convertedPoints);
+
+        mCircle = null;
+
+        deinitialize(currentRouteData);
+        deinitialize(currentDeviatedRouteData);
+        deinitialize(deviatedRouteData);
+
+        deinitialize(nearestPointValuesList);
+        deinitialize(OldNearestGpsList);
+        SourceNode = null;
+        DestinationNode = null;
+        currentGpsPosition = null;
+        if(myTimer != null) {
+            myTimer.cancel();
+        }
+        myTimer = null;
+        currentPerpendicularPoint = null;
+
+
+        deinitialize(commonPoints);
+        deinitialize(uncommonPoints);
+
+        deinitialize(consDistList);
+
+        deinitialize(destinationGeoFenceCoordinatesList);
+        deinitialize(messageContainer);
+
+        deinitialize(messageContainerTemp);
+
+        currentPolylineOptions = null;
+        currentPolylineGraphics = null;
+
+        deviatedPolylineOptions = null;
+        deviatedPolylineGraphics = null;
+
+        deinitialize(edgeDataList);
+
+        nearlyFirstGPSPosition = null;
+
+        locationUpdatesService = null;
+
         super.onDestroy();
-        Log.e("ON DESTROY"," NSGI MAP FRAGMENT ACTIVITY ");
-//        if (mFusedLocationClient != null) {
-//            stopLocationUpdates();
-//            mFusedLocationClient = null;
-//        }
-//        locationRequest = null;
-//        locationCallback = null;
     }
 
 
@@ -1326,136 +1326,136 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 if (getActivity() != null) {
 
                     routeAPIHit = true;
-                    DownloadRouteFromURL download = new DownloadRouteFromURL(new AsyncResponse() {
-                        @Override
-                        public void processFinish(Object output) {
+                    if(asyncResponse == null) {
+                        asyncResponse = new AsyncResponse() {
+                            @Override
+                            public void processFinish(Object output) {
 
-                            try {
+                                try {
 
-                                // initialize global variables and save data to DB
-                                getRouteDetails((String) output);
+                                    // initialize global variables and save data to DB
+                                    getRouteDetails((String) output);
 
-                                //COMPARE OLD AND NEW ROUTES - MAKE FINAL ROUTE
+                                    //COMPARE OLD AND NEW ROUTES - MAKE FINAL ROUTE
 
-                                //PLOT ON MAP
+                                    //PLOT ON MAP
 
-                                //DISPLAY ROUTE DEVIATION MESSAGE AND VOICE ALERT
+                                    //DISPLAY ROUTE DEVIATION MESSAGE AND VOICE ALERT
 
-                                //FOLLOW NEW ROUTE FOR FURTHER DEVIATIONS
+                                    //FOLLOW NEW ROUTE FOR FURTHER DEVIATIONS
 
-                                Log.e("ROUTE DEV MKR UPDATE", " WITHIN ROUTE API HIT----");
+                                    Log.e("ROUTE DEV MKR UPDATE", " WITHIN ROUTE API HIT----");
 
-                                if (currentDeviatedRouteData != null && currentDeviatedRouteData.size() > 0) {
+                                    if (currentDeviatedRouteData != null && currentDeviatedRouteData.size() > 0) {
 
-                                    Log.e("ROUTE DEV MKR UPDATE", " AFTER RECVD DATA FROM API----");
+                                        Log.e("ROUTE DEV MKR UPDATE", " AFTER RECVD DATA FROM API----");
 
-                                    //original routes - eliminating duplicate coordinates in line segments
-                                    currentRouteDataLocal.addAll(cloneCoordinates(currentRouteData));
+                                        //original routes - eliminating duplicate coordinates in line segments
+                                        currentRouteDataLocal.addAll(cloneCoordinates(currentRouteData));
 
-                                    // List<LatLng> currentRouteDataLocal = removeDuplicatesRouteDeviated(RouteDeviationPointsForComparision);
-                                    Log.e("DESTINATION POSITION", "DESTINATION POSITION" + DestinationNode);
-                                    Log.e("ROUTE DEV MKR UPDATE", "BEFORE VERIFICATION OF OLD AND NEW ROUTE");
-                                    //Issue here may be
-                                    compareDeviatedRouteWithCurrentRoute(currentRouteDataLocal, currentDeviatedRouteData);
+                                        // List<LatLng> currentRouteDataLocal = removeDuplicatesRouteDeviated(RouteDeviationPointsForComparision);
+                                        Log.e("DESTINATION POSITION", "DESTINATION POSITION" + DestinationNode);
+                                        Log.e("ROUTE DEV MKR UPDATE", "BEFORE VERIFICATION OF OLD AND NEW ROUTE");
+                                        //Issue here may be
+                                        compareDeviatedRouteWithCurrentRoute(currentRouteDataLocal, currentDeviatedRouteData);
 
-                                    Log.e("List Verification", "List Verification commonPoints --  DATA " + commonPoints.size());
-                                    Log.e("List Verification", "List Verification  new_unCommonPoints -- DATA " + uncommonPoints.size());
+                                        Log.e("List Verification", "List Verification commonPoints --  DATA " + commonPoints.size());
+                                        Log.e("List Verification", "List Verification  new_unCommonPoints -- DATA " + uncommonPoints.size());
 
-                                    Log.e("ROUTE DEV MKR UPDATE", "BEFORE PLOTTING DEVIATED ROUTE");
+                                        Log.e("ROUTE DEV MKR UPDATE", "BEFORE PLOTTING DEVIATED ROUTE");
 
-                                    Log.e("ROUTE DEV MKR UPDATE", "BEFORE PLOTTING DEVIATED ROUTE, UNCOMMON POINTS SIZE:" + uncommonPoints.size());
+                                        Log.e("ROUTE DEV MKR UPDATE", "BEFORE PLOTTING DEVIATED ROUTE, UNCOMMON POINTS SIZE:" + uncommonPoints.size());
 
-                                    if (uncommonPoints.size() > 1) {
+                                        if (uncommonPoints.size() > 1) {
 
-                                        //  Log.e("Route Deviation", " IS ROUTE VERIFY  ###### " + " Route COINSIDENCE");
-                                        List<LatLng> tmpVar = mergeRoutes(currentRouteDataLocal, currentDeviatedRouteData, routeDeviatedSourcePosition);
-                                        currentRouteData.clear();
-                                        currentRouteData.addAll(tmpVar);
+                                            //  Log.e("Route Deviation", " IS ROUTE VERIFY  ###### " + " Route COINSIDENCE");
+                                            List<LatLng> tmpVar = mergeRoutes(currentRouteDataLocal, currentDeviatedRouteData, routeDeviatedSourcePosition);
+                                            currentRouteData.clear();
+                                            currentRouteData.addAll(tmpVar);
 
-                                        //refresh the message container with the new one as the route is deviated
-                                        messageContainer.clear();
-                                        messageContainer.addAll(messageContainerTemp);
+                                            //refresh the message container with the new one as the route is deviated
+                                            messageContainer.clear();
+                                            messageContainer.addAll(messageContainerTemp);
 
-                                        if (deviatedRouteData.size() == 0) {
-                                            // adding the perpendicular point to start,  for the first deviation
-                                            currentDeviatedRouteData.add(0, nearest_LatLng_deviation);
-                                        }
-
-                                        //add the deviated route
-                                        tmpVar = mergeRoutes(deviatedRouteData, currentDeviatedRouteData, routeDeviatedSourcePosition);
-                                        deviatedRouteData.clear();
-                                        deviatedRouteData.addAll(tmpVar);
-
-                                        //Plotting uncommon points as a line here
-                                        if (mPositionMarker != null && mPositionMarker.isVisible()) {
-
-                                            if (deviatedRouteData.size() > 1) {
-                                                if (deviatedPolylineGraphics == null) {
-                                                    deviatedPolylineOptions.addAll(cloneCoordinates(deviatedRouteData));
-                                                    deviatedPolylineOptions.color(NSGIMapFragmentActivity.DEVIATED_ROUTE_COLOR).width(NSGIMapFragmentActivity.DEVIATED_ROUTE_WIDTH);
-                                                    deviatedPolylineGraphics = mMap.addPolyline(deviatedPolylineOptions);
-                                                } else {
-                                                    deviatedPolylineGraphics.setPoints(cloneCoordinates(deviatedRouteData));
-                                                    deviatedPolylineGraphics.setColor(NSGIMapFragmentActivity.DEVIATED_ROUTE_COLOR);
-                                                    deviatedPolylineGraphics.setWidth(NSGIMapFragmentActivity.DEVIATED_ROUTE_WIDTH);
-                                                }
+                                            if (deviatedRouteData.size() == 0) {
+                                                // adding the perpendicular point to start,  for the first deviation
+                                                currentDeviatedRouteData.add(0, nearest_LatLng_deviation);
                                             }
 
-                                            Log.e("ROUTE DEV MKR UPDATE", "DEVIATED ROUTE PLOTTED");
-                                            // isContinuoslyOutOfTrack = true;
-                                            if (getActivity() != null) {
-                                                Log.e("START OF DEV MSG LOG", "ENTERED INTO DEVIATION MSG LOG");
-                                                Log.e("ROUTE DEV MKR UPDATE", "RAISE TOAST MESSAGE ONLY ONCE");
-                                                LayoutInflater inflater1 = getActivity().getLayoutInflater();
-                                                @SuppressLint("WrongViewCast") View layout = inflater1.inflate(R.layout.custom_toast, (ViewGroup) getActivity().findViewById(R.id.textView_toast));
-                                                TextView text = (TextView) layout.findViewById(R.id.textView_toast);
-                                                text.setText(" ROUTE DEVIATED ");
-                                                // set image deviated
-                                                final ImageView image = (ImageView) layout.findViewById(R.id.image_toast);
-                                                String deviatedText = " ROUTE DEVIATED ";
-                                                if (deviatedText.startsWith(" ROUTE DEVIATED ")) {
-                                                    image.setImageResource(R.drawable.deviate_64);
-                                                }
-                                                //set image deviated
+                                            //add the deviated route
+                                            tmpVar = mergeRoutes(deviatedRouteData, currentDeviatedRouteData, routeDeviatedSourcePosition);
+                                            deviatedRouteData.clear();
+                                            deviatedRouteData.addAll(tmpVar);
 
-                                                Toast toast = new Toast(getActivity().getApplicationContext());
-                                                toast.setDuration(Toast.LENGTH_LONG);
-                                                toast.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 0);
-                                                toast.setGravity(Gravity.TOP, 0, 150);
-                                                toast.setView(layout);
-                                                toast.show();
-                                                StringBuilder routeDeviatedAlert = new StringBuilder();
-                                                routeDeviatedAlert.append("ROUTE DEVIATED" + " RouteDeviatedSourcePosition : " + routeDeviatedSourcePosition);
-                                                sendData(MapEvents.ALERTVALUE_3, MapEvents.ALERTTYPE_3);
-                                                Log.e("Route Deviation", " Route Deviation Alert POSTED" + MapEvents.ALERTVALUE_3);
-                                                Log.e(" END OF DEV MSG LOG", "ENTERED INTO DEVIATION MSG LOG");
-                                                alertDestination(currentGpsPosition);
-                                                // added on 25-04-20 by SKC
-                                                int timeTakenTillNow = (int) (System.currentTimeMillis() - startTimestamp) / 1000;
-                                                if (timeTakenTillNow >= 5) {
-                                                    calculateETA(startTimestamp, currentGpsPosition, currentRouteData);
+                                            //Plotting uncommon points as a line here
+                                            if (mPositionMarker != null && mPositionMarker.isVisible()) {
+
+                                                if (deviatedRouteData.size() > 1) {
+                                                    if (deviatedPolylineGraphics == null) {
+                                                        deviatedPolylineOptions.addAll(cloneCoordinates(deviatedRouteData));
+                                                        deviatedPolylineOptions.color(NSGIMapFragmentActivity.DEVIATED_ROUTE_COLOR).width(NSGIMapFragmentActivity.DEVIATED_ROUTE_WIDTH);
+                                                        deviatedPolylineGraphics = mMap.addPolyline(deviatedPolylineOptions);
+                                                    } else {
+                                                        deviatedPolylineGraphics.setPoints(cloneCoordinates(deviatedRouteData));
+                                                        deviatedPolylineGraphics.setColor(NSGIMapFragmentActivity.DEVIATED_ROUTE_COLOR);
+                                                        deviatedPolylineGraphics.setWidth(NSGIMapFragmentActivity.DEVIATED_ROUTE_WIDTH);
+                                                    }
+                                                }
+
+                                                Log.e("ROUTE DEV MKR UPDATE", "DEVIATED ROUTE PLOTTED");
+                                                // isContinuoslyOutOfTrack = true;
+                                                if (getActivity() != null) {
+                                                    Log.e("START OF DEV MSG LOG", "ENTERED INTO DEVIATION MSG LOG");
+                                                    Log.e("ROUTE DEV MKR UPDATE", "RAISE TOAST MESSAGE ONLY ONCE");
+                                                    LayoutInflater inflater1 = getActivity().getLayoutInflater();
+                                                    @SuppressLint("WrongViewCast") View layout = inflater1.inflate(R.layout.custom_toast, (ViewGroup) getActivity().findViewById(R.id.textView_toast));
+                                                    TextView text = (TextView) layout.findViewById(R.id.textView_toast);
+                                                    text.setText(" ROUTE DEVIATED ");
+                                                    // set image deviated
+                                                    final ImageView image = (ImageView) layout.findViewById(R.id.image_toast);
+                                                    String deviatedText = " ROUTE DEVIATED ";
+                                                    if (deviatedText.startsWith(" ROUTE DEVIATED ")) {
+                                                        image.setImageResource(R.drawable.deviate_64);
+                                                    }
+                                                    //set image deviated
+
+                                                    Toast toast = new Toast(getActivity().getApplicationContext());
+                                                    toast.setDuration(Toast.LENGTH_LONG);
+                                                    toast.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 0);
+                                                    toast.setGravity(Gravity.TOP, 0, 150);
+                                                    toast.setView(layout);
+                                                    toast.show();
+                                                    StringBuilder routeDeviatedAlert = new StringBuilder();
+                                                    routeDeviatedAlert.append("ROUTE DEVIATED" + " RouteDeviatedSourcePosition : " + routeDeviatedSourcePosition);
+                                                    sendData(MapEvents.ALERTVALUE_3, MapEvents.ALERTTYPE_3);
+                                                    Log.e("Route Deviation", " Route Deviation Alert POSTED" + MapEvents.ALERTVALUE_3);
+                                                    Log.e(" END OF DEV MSG LOG", "ENTERED INTO DEVIATION MSG LOG");
+                                                    alertDestination(currentGpsPosition);
+                                                    // added on 25-04-20 by SKC
+                                                    int timeTakenTillNow = (int) (System.currentTimeMillis() - startTimestamp) / 1000;
+                                                    if (timeTakenTillNow >= 5) {
+                                                        calculateETA(startTimestamp, currentGpsPosition, currentRouteData);
+                                                    }
                                                 }
                                             }
                                         }
+
                                     }
-
+                                } catch (Exception ex) {
+                                    Log.e("VerifyRoute", "VerifyRoute error", ex);
+                                } finally {
+                                    routeAPIHit = false;
                                 }
-                            } catch (Exception ex) {
-                                Log.e("VerifyRoute", "VerifyRoute error", ex);
-                            } finally {
-                                routeAPIHit = false;
                             }
-                        }
-                    });
+                        };
+                    }
 
+                    DownloadRouteFromURL download = new DownloadRouteFromURL(asyncResponse, routeDeviatedDT_URL,AuthorisationKey);
                     download.execute(routeDiationPosition, destPoint);
                 }
             }
         }
     }
-
-
-
 
 
     public void compareDeviatedRouteWithCurrentRoute(List<LatLng> currentRoute, List<LatLng> deviatedRoute) {
@@ -1501,48 +1501,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
     }
 
-    public interface AsyncResponse {
-        void processFinish(Object output);
-    }
 
-    public class DownloadRouteFromURL extends AsyncTask<String, String, String> {
-
-        public AsyncResponse delegate = null;//Call back interface
-
-        public DownloadRouteFromURL(AsyncResponse asyncResponse) {
-            delegate = asyncResponse;//Assigning call back interfacethrough constructor
-        }
-
-        @Override
-        protected void onPostExecute(String result) {
-            if (delegate != null) {
-                delegate.processFinish(result);
-            }
-        }
-
-        @Override
-        protected void onPreExecute() {
-            super.onPreExecute();
-        }
-
-        @Override
-        protected String doInBackground(String... params) {
-            try {
-                String param1, param2;
-                param1 = params[0];
-                param2 = params[1];
-                if (httpRequestFlag == false) {
-                    return HttpPost(routeDeviatedDT_URL, param1, param2, AuthorisationKey);
-                }
-            } catch (Exception e) {
-                Log.e("doInBackground", e.getMessage(), e);
-            }
-            return null;
-        }
-
-        protected void onProgressUpdate(String... progress) {
-        }
-    }
 
 
     private void getRouteDetails(String FeatureResponse) {
@@ -1705,10 +1664,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
 
     }
-
-
-
-
 
 
     public void addMarkers() {
@@ -1878,12 +1833,8 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
     private boolean checkPermission() {
-//        int result = ContextCompat.checkSelfPermission(getContext(), ACCESS_FINE_LOCATION);
-//        int result1 = ContextCompat.checkSelfPermission(getContext(), READ_EXTERNAL_STORAGE);
-//
-//        return true;
         return PackageManager.PERMISSION_GRANTED == ContextCompat.checkSelfPermission(getContext(), ACCESS_FINE_LOCATION) &&
-                    PackageManager.PERMISSION_GRANTED == ContextCompat.checkSelfPermission(getContext(), READ_EXTERNAL_STORAGE);
+                PackageManager.PERMISSION_GRANTED == ContextCompat.checkSelfPermission(getContext(), READ_EXTERNAL_STORAGE);
     }
 
     private void requestPermission() {

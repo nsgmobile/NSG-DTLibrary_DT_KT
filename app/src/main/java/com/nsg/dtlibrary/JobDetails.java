@@ -18,21 +18,23 @@ import android.widget.Spinner;
  *
  */
 public class JobDetails extends Activity {
- // private double srcLatitude=55.067291;
- // private double srcLongitude=24.978782;
- // private double destLatitude=55.067205;
+    // private double srcLatitude=55.067291;
+    // private double srcLongitude=24.978782;
+    // private double destLatitude=55.067205;
 //  private double desLongitude=24.979878;
 
-   private int enteredMode=1;
-   private int bufferSize=10;
-   private String charlsisNumber;
-   private Button draw_route;
+    private int enteredMode=1;
+    private int bufferSize=10;
+    private String charlsisNumber;
+    private Button draw_route;
+    private Spinner Spinner_Ch_Number;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.job_test);
         draw_route=(Button)findViewById(R.id.route_test);
-        Spinner Spinner_Ch_Number = (Spinner)findViewById(R.id.Spinner_Ch_Number);
+        Spinner_Ch_Number = (Spinner)findViewById(R.id.Spinner_Ch_Number);
 
         final ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(JobDetails.this,
                 R.array.Spinner_Ch_Number, android.R.layout.simple_spinner_item);
@@ -55,65 +57,65 @@ public class JobDetails extends Activity {
             @Override
             public void onClick(View view) {
                 Log.e("SpinnerDT :", " Selected Item From SpinnerDT " + charlsisNumber);
-             //   if (charlsisNumber.isEmpty()) {
-                    if (charlsisNumber.equals("RD1")) {
-                        double srcLatitude=55.067291;
-                        double srcLongitude=24.978782;
-                        double destLatitude=55.067205;
-                        double desLongitude=24.979878;
+                //   if (charlsisNumber.isEmpty()) {
+                if (charlsisNumber.equals("RD1")) {
+                    double srcLatitude=55.067291;
+                    double srcLongitude=24.978782;
+                    double destLatitude=55.067205;
+                    double desLongitude=24.979878;
 
-                        //24.979878,55.067205
-                        //24.978488,55.066921 24.981227,55.070077
-                       // double srcLatitude = 55.072528;
-                      //  double srcLongitude = 24.986486;
-                      //  double destLatitude = 55.073878;
-                      //  double desLongitude = 24.986097;
+                    //24.979878,55.067205
+                    //24.978488,55.066921 24.981227,55.070077
+                    // double srcLatitude = 55.072528;
+                    //  double srcLongitude = 24.986486;
+                    //  double destLatitude = 55.073878;
+                    //  double desLongitude = 24.986097;
 
-                        Intent NSGIIntent = new Intent(JobDetails.this, NSGApiActivity.class);
-                        Bundle NSGIBundle = new Bundle();
-                        NSGIBundle.putString("charlsisNumber", "RD1");
-                        NSGIBundle.putDouble("srcLatitude", srcLatitude);
-                        NSGIBundle.putDouble("srcLongitude", srcLongitude);
-                        NSGIBundle.putDouble("destLatitude", destLatitude);
-                        NSGIBundle.putDouble("desLongitude", desLongitude);
-                        NSGIBundle.putInt("enteredMode", enteredMode);
-                        NSGIBundle.putInt("bufferSize", bufferSize);
-                        NSGIIntent.putExtras(NSGIBundle);
-                        startActivity(NSGIIntent);
-                    } else if (charlsisNumber.equals("RD2")) {
-                        Intent NSGIIntent = new Intent(JobDetails.this, NSGApiActivity.class);
-                        double srcLatitude = 55.076897;
-                        double srcLongitude = 24.989081;
-                        double destLatitude = 55.077639;
-                        double desLongitude = 24.988377;
-                        Bundle NSGIBundle = new Bundle();
-                        NSGIBundle.putString("charlsisNumber", "RD2");
-                        NSGIBundle.putDouble("srcLatitude", srcLatitude);
-                        NSGIBundle.putDouble("srcLongitude", srcLongitude);
-                        NSGIBundle.putDouble("destLatitude", destLatitude);
-                        NSGIBundle.putDouble("desLongitude", desLongitude);
-                        NSGIBundle.putInt("enteredMode", enteredMode);
-                        NSGIBundle.putInt("bufferSize", bufferSize);
-                        NSGIIntent.putExtras(NSGIBundle);
-                        startActivity(NSGIIntent);
-                    } else if (charlsisNumber.equals("RD3")) {
-                        double srcLatitude = 55.066921;
-                        double srcLongitude = 24.978488;
-                        double destLatitude = 55.070077;
-                        double desLongitude = 24.981227;
+                    Intent NSGIIntent = new Intent(JobDetails.this, NSGApiActivity.class);
+                    Bundle NSGIBundle = new Bundle();
+                    NSGIBundle.putString("charlsisNumber", "RD1");
+                    NSGIBundle.putDouble("srcLatitude", srcLatitude);
+                    NSGIBundle.putDouble("srcLongitude", srcLongitude);
+                    NSGIBundle.putDouble("destLatitude", destLatitude);
+                    NSGIBundle.putDouble("desLongitude", desLongitude);
+                    NSGIBundle.putInt("enteredMode", enteredMode);
+                    NSGIBundle.putInt("bufferSize", bufferSize);
+                    NSGIIntent.putExtras(NSGIBundle);
+                    startActivity(NSGIIntent);
+                } else if (charlsisNumber.equals("RD2")) {
+                    Intent NSGIIntent = new Intent(JobDetails.this, NSGApiActivity.class);
+                    double srcLatitude = 55.076897;
+                    double srcLongitude = 24.989081;
+                    double destLatitude = 55.077639;
+                    double desLongitude = 24.988377;
+                    Bundle NSGIBundle = new Bundle();
+                    NSGIBundle.putString("charlsisNumber", "RD2");
+                    NSGIBundle.putDouble("srcLatitude", srcLatitude);
+                    NSGIBundle.putDouble("srcLongitude", srcLongitude);
+                    NSGIBundle.putDouble("destLatitude", destLatitude);
+                    NSGIBundle.putDouble("desLongitude", desLongitude);
+                    NSGIBundle.putInt("enteredMode", enteredMode);
+                    NSGIBundle.putInt("bufferSize", bufferSize);
+                    NSGIIntent.putExtras(NSGIBundle);
+                    startActivity(NSGIIntent);
+                } else if (charlsisNumber.equals("RD3")) {
+                    double srcLatitude = 55.066921;
+                    double srcLongitude = 24.978488;
+                    double destLatitude = 55.070077;
+                    double desLongitude = 24.981227;
 
-                        Intent NSGIIntent = new Intent(JobDetails.this, NSGApiActivity.class);
-                        Bundle NSGIBundle = new Bundle();
-                        NSGIBundle.putString("charlsisNumber", "RD3");
-                        NSGIBundle.putDouble("srcLatitude", srcLatitude);
-                        NSGIBundle.putDouble("srcLongitude", srcLongitude);
-                        NSGIBundle.putDouble("destLatitude", destLatitude);
-                        NSGIBundle.putDouble("desLongitude", desLongitude);
-                        NSGIBundle.putInt("enteredMode", enteredMode);
-                        NSGIBundle.putInt("bufferSize", bufferSize);
-                        NSGIIntent.putExtras(NSGIBundle);
-                        startActivity(NSGIIntent);
-                    }
+                    Intent NSGIIntent = new Intent(JobDetails.this, NSGApiActivity.class);
+                    Bundle NSGIBundle = new Bundle();
+                    NSGIBundle.putString("charlsisNumber", "RD3");
+                    NSGIBundle.putDouble("srcLatitude", srcLatitude);
+                    NSGIBundle.putDouble("srcLongitude", srcLongitude);
+                    NSGIBundle.putDouble("destLatitude", destLatitude);
+                    NSGIBundle.putDouble("desLongitude", desLongitude);
+                    NSGIBundle.putInt("enteredMode", enteredMode);
+                    NSGIBundle.putInt("bufferSize", bufferSize);
+                    NSGIIntent.putExtras(NSGIBundle);
+                    startActivity(NSGIIntent);
+                }
                     /*
                 }else{
 
@@ -155,5 +157,22 @@ public class JobDetails extends Activity {
             }
         });
 
+    }
+
+    @Override
+    protected void onDestroy() {
+
+        if(draw_route != null) {
+            draw_route.setOnClickListener(null);
+            draw_route = null;
+        }
+
+        if(Spinner_Ch_Number != null) {
+            Spinner_Ch_Number.setOnItemSelectedListener(null);
+            Spinner_Ch_Number.setAdapter(null);
+            Spinner_Ch_Number = null;
+        }
+
+        super.onDestroy();
     }
 }
