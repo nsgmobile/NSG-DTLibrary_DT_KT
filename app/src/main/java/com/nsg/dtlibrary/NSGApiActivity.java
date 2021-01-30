@@ -3261,10 +3261,11 @@ public class NSGApiActivity extends FragmentActivity implements NSGIMapFragmentA
     @Override
     public void onDestroy(){
         Log.e("ON DESTROY"," NSGI API ACTIVITY ");
-        FragmentManager fragmentManager = getSupportFragmentManager();
-        FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-//        fragmentTransaction.remove(test).commit();
-        fragmentTransaction.commitNowAllowingStateLoss();
+        if(test != null) {
+            FragmentManager fragmentManager = getSupportFragmentManager();
+            FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+            fragmentTransaction.remove(test).commitNowAllowingStateLoss();
+        }
         super.onDestroy();
     }
 
