@@ -3186,7 +3186,7 @@ public class NSGApiActivity extends FragmentActivity implements NSGIMapFragmentA
     String CSVFile_Path= Environment.getExternalStorageDirectory() + File.separator + "MBTILES" + File.separator + "RouteSample"+".txt";
   //  com.nsg.dtlibrary.NavigationProperties properties=new com.nsg.dtlibrary.NavigationProperties();
 
-    NSGIMapFragmentActivity test = new NSGIMapFragmentActivity(BASE_MAP_URL_FORMAT,SourcePosition,DestinationPosition,routeData,bufferSize,routeDeviatedDT_URL,AuthorisationKey,GeoFenceCordinates,true);
+    NSGIMapFragmentActivity test = NSGIMapFragmentActivity.getInstance(BASE_MAP_URL_FORMAT,SourcePosition,DestinationPosition,routeData,bufferSize,routeDeviatedDT_URL,AuthorisationKey,GeoFenceCordinates,true);
   // NSGTiledLayerOnMap test = new NSGTiledLayerOnMap(BASE_MAP_URL_FORMAT);
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -3256,6 +3256,16 @@ public class NSGApiActivity extends FragmentActivity implements NSGIMapFragmentA
     public void onResume() {
         super.onResume();
 
+    }
+
+    @Override
+    public void onDestroy(){
+        Log.e("ON DESTROY"," NSGI API ACTIVITY ");
+        FragmentManager fragmentManager = getSupportFragmentManager();
+        FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+//        fragmentTransaction.remove(test).commit();
+        fragmentTransaction.commitNowAllowingStateLoss();
+        super.onDestroy();
     }
 
     @Override

@@ -15,11 +15,9 @@ import android.content.ServiceConnection;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Matrix;
 import android.graphics.Point;
-import android.graphics.drawable.Drawable;
 import android.location.Location;
 import android.location.LocationManager;
 import android.os.AsyncTask;
@@ -47,18 +45,23 @@ import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import android.view.animation.Interpolator;
+import android.view.animation.LinearInterpolator;
+import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+import androidx.fragment.app.Fragment;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+
 import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationCallback;
 import com.google.android.gms.location.LocationRequest;
-import com.google.android.gms.location.LocationResult;
-import com.google.android.gms.location.LocationServices;
 import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.Projection;
 import com.google.android.gms.maps.SupportMapFragment;
-import com.google.android.gms.maps.model.BitmapDescriptor;
-import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CameraPosition;
 import com.google.android.gms.maps.model.Circle;
 import com.google.android.gms.maps.model.CircleOptions;
@@ -66,15 +69,12 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MapStyleOptions;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.android.gms.maps.model.PolygonOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.maps.model.TileOverlay;
 import com.google.android.gms.maps.model.TileOverlayOptions;
 import com.google.android.gms.maps.model.TileProvider;
-import com.google.android.gms.tasks.OnCompleteListener;
 import com.google.android.gms.tasks.OnSuccessListener;
-import com.google.android.gms.tasks.Task;
 import com.google.maps.android.PolyUtil;
 import com.google.maps.android.SphericalUtil;
 import com.nsg.nsgdtlibrary.Classes.activities.AppConstants;
@@ -88,42 +88,36 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.math.BigDecimal;
-import java.net.HttpURLConnection;
-import java.net.URL;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Objects;
-import java.util.Random;
-import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
-import androidx.core.app.ActivityCompat;
-import androidx.core.content.ContextCompat;
-import androidx.fragment.app.Fragment;
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
-
 import static android.Manifest.permission.ACCESS_FINE_LOCATION;
 import static android.Manifest.permission.READ_EXTERNAL_STORAGE;
-import static android.content.Context.LOCATION_SERVICE;
-import static java.lang.Math.atan2;
-import static java.lang.Math.cos;
-import static java.lang.Math.sin;
+import static com.nsg.nsgdtlibrary.Classes.util.Utils.HttpPost;
+import static com.nsg.nsgdtlibrary.Classes.util.Utils.bearingBetweenLocations;
+import static com.nsg.nsgdtlibrary.Classes.util.Utils.bitmapDescriptorFromVector;
+import static com.nsg.nsgdtlibrary.Classes.util.Utils.calculateDistanceAlongLineFromStart;
+import static com.nsg.nsgdtlibrary.Classes.util.Utils.cloneCoordinate;
+import static com.nsg.nsgdtlibrary.Classes.util.Utils.cloneCoordinates;
+import static com.nsg.nsgdtlibrary.Classes.util.Utils.computeRotation;
+import static com.nsg.nsgdtlibrary.Classes.util.Utils.distFrom;
+import static com.nsg.nsgdtlibrary.Classes.util.Utils.findNearestPointOnLine;
+import static com.nsg.nsgdtlibrary.Classes.util.Utils.getAngle;
+import static com.nsg.nsgdtlibrary.Classes.util.Utils.mergeRoutes;
+import static com.nsg.nsgdtlibrary.Classes.util.Utils.pointWithinPolygon;
+import static com.nsg.nsgdtlibrary.Classes.util.Utils.removeDuplicatesRouteDeviated;
+import static com.nsg.nsgdtlibrary.Classes.util.Utils.reverseCoordinate;
+import static com.nsg.nsgdtlibrary.Classes.util.Utils.reverseCoordinates;
+import static com.nsg.nsgdtlibrary.Classes.util.Utils.setEstimatedTime;
+import static com.nsg.nsgdtlibrary.Classes.util.Utils.showDistance;
+import static com.nsg.nsgdtlibrary.Classes.util.Utils.splitLineByPoint;
 
 //import com.google.android.gms.location.LocationListener;
 //import static android.Manifest.permission.ACCESS_FINE_LOCATION;
@@ -223,7 +217,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     private static double MINIMUM_VEHICLE_SPEED = 30d; // KM/HR
 
     private int estimatedTimeInSeconds = 0;
-    private static int AVERAGE_SPEED = 30;
+    public static int AVERAGE_SPEED = 30;
 
     private boolean isETACrossed = false;
 
@@ -295,12 +289,20 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
     @SuppressLint("ValidFragment")
-    public NSGIMapFragmentActivity(String BASE_MAP_URL_FORMAT) {
+    private NSGIMapFragmentActivity(String BASE_MAP_URL_FORMAT) {
         this.BASE_MAP_URL_FORMAT = BASE_MAP_URL_FORMAT;
     }
 
+    public static NSGIMapFragmentActivity getInstance(String BASE_MAP_URL_FORMAT) {
+        return new NSGIMapFragmentActivity(BASE_MAP_URL_FORMAT);
+    }
+
+    public static NSGIMapFragmentActivity getInstance(String BASE_MAP_URL_FORMAT, String stNode, String endNode, String routeData, int routeDeviationBuffer, String routeDeviatedDT_URL, String AuthorisationKey, String geoFenceCoordinates, boolean isWriteLogFile) {
+        return new NSGIMapFragmentActivity(BASE_MAP_URL_FORMAT,stNode,endNode,routeData,routeDeviationBuffer,routeDeviatedDT_URL,AuthorisationKey,geoFenceCoordinates,isWriteLogFile);
+    }
+
     @SuppressLint("ValidFragment")
-    public NSGIMapFragmentActivity(String BASE_MAP_URL_FORMAT, String stNode, String endNode, String routeData, int routeDeviationBuffer, String routeDeviatedDT_URL, String AuthorisationKey, String GeoFenceCordinates, boolean isWriteLogFile) {
+    private NSGIMapFragmentActivity(String BASE_MAP_URL_FORMAT, String stNode, String endNode, String routeData, int routeDeviationBuffer, String routeDeviatedDT_URL, String AuthorisationKey, String GeoFenceCordinates, boolean isWriteLogFile) {
         this.BASE_MAP_URL_FORMAT = BASE_MAP_URL_FORMAT;
         this.stNode = stNode;
         this.endNode = endNode;
@@ -433,9 +435,10 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         //Check self permissions for Location and storage
-        checkPermission();
-        //Request permissions for Location and storage
-        requestPermission();
+        if(!checkPermission()){
+            //Request permissions for Location and storage
+            requestPermission();
+        }
         //set marker icon
         mMarkerIcon = BitmapFactory.decodeResource(getResources(), R.drawable.gps_transperent_98);
         //Initialise RootView
@@ -449,9 +452,9 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
         //Initialise Buttons
 
-       // dynamic_changeValue = (EditText) rootView.findViewById(R.id.dynamic_buffer);
-      //  submit = (Button) rootView.findViewById(R.id.submit);
-      //  submit.setOnClickListener(NSGIMapFragmentActivity.this);
+        // dynamic_changeValue = (EditText) rootView.findViewById(R.id.dynamic_buffer);
+        //  submit = (Button) rootView.findViewById(R.id.submit);
+        //  submit.setOnClickListener(NSGIMapFragmentActivity.this);
         re_center = (ImageButton) rootView.findViewById(R.id.re_center);
         re_center.setOnClickListener(NSGIMapFragmentActivity.this);
         change_map_options = (ImageButton) rootView.findViewById(R.id.change_map_options);
@@ -621,7 +624,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         if (SourceNode != null && DestinationNode != null) {
 
             //estimate the projected travelling time
-            setEstimatedTime(currentRouteData);
+            estimatedTimeInSeconds = setEstimatedTime(currentRouteData);
 
             isETACrossed = false;
 
@@ -645,47 +648,47 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                         myTimer = new Timer();
                     }
 
-                        myTimer.scheduleAtFixedRate(new TimerTask() {
-                            @Override
-                            public void run() {
-                                if (currentGpsPosition != null && DestinationNode != null && isNavigationStarted) {
-                                    if (!islocationControlEnabled && !isContinuoslyOutOfTrack) {
+                    myTimer.scheduleAtFixedRate(new TimerTask() {
+                        @Override
+                        public void run() {
+                            if (currentGpsPosition != null && DestinationNode != null && isNavigationStarted) {
+                                if (!islocationControlEnabled && !isContinuoslyOutOfTrack) {
 
-                                        displayNavigationMessage(currentGpsPosition);
-                                        // if (time != null && !time.toString().isEmpty() && estimatedRemainingTime > 0) {
-                                        // ETA Calculation
+                                    displayNavigationMessage(currentGpsPosition);
+                                    // if (time != null && !time.toString().isEmpty() && estimatedRemainingTime > 0) {
+                                    // ETA Calculation
 
-                                        if (estimatedRemainingTime > 0) {
-                                            if (getActivity() != null) {
-                                                new Handler(Looper.getMainLooper()).post(new Runnable() {
-                                                    @Override
-                                                    public void run() {
-                                                        String etaMessage = "";
-                                                        if (estimatedRemainingTime > 60) {
-                                                            int minute = estimatedRemainingTime / 60;
-                                                            int sec = estimatedRemainingTime % 60;
-                                                            etaMessage = "ETA: " + minute + "min. " + sec + "sec";
-                                                        } else {
-                                                            etaMessage = "ETA: " + estimatedRemainingTime + "sec";
-                                                        }
-                                                        Toast toast = Toast.makeText(getActivity().getApplicationContext(), etaMessage, Toast.LENGTH_SHORT);
-                                                        toast.setMargin(70, 50);
-                                                        toast.setGravity(Gravity.BOTTOM, 0, 120);
-                                                        if (isETACrossed) {
-                                                            toast.getView().setBackgroundColor(Color.RED);
-                                                        }
-                                                        toast.show();
+                                    if (estimatedRemainingTime > 0) {
+                                        if (getActivity() != null) {
+                                            new Handler(Looper.getMainLooper()).post(new Runnable() {
+                                                @Override
+                                                public void run() {
+                                                    String etaMessage = "";
+                                                    if (estimatedRemainingTime > 60) {
+                                                        int minute = estimatedRemainingTime / 60;
+                                                        int sec = estimatedRemainingTime % 60;
+                                                        etaMessage = "ETA: " + minute + "min. " + sec + "sec";
+                                                    } else {
+                                                        etaMessage = "ETA: " + estimatedRemainingTime + "sec";
                                                     }
-                                                });
-                                            }
+                                                    Toast toast = Toast.makeText(getActivity().getApplicationContext(), etaMessage, Toast.LENGTH_SHORT);
+                                                    toast.setMargin(70, 50);
+                                                    toast.setGravity(Gravity.BOTTOM, 0, 120);
+                                                    if (isETACrossed) {
+                                                        toast.getView().setBackgroundColor(Color.RED);
+                                                    }
+                                                    toast.show();
+                                                }
+                                            });
                                         }
-
                                     }
 
                                 }
-                            }
 
-                        }, 10L, 8000L);
+                            }
+                        }
+
+                    }, 10L, 8000L);
 //                    } //end of Timer if
 
                     mMap.setMyLocationEnabled(true);
@@ -959,7 +962,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                 }
 
 
-                               // Log.e("RECALL", "Re calling Location trigger method on 19 jan 2021 : " );
+                                // Log.e("RECALL", "Re calling Location trigger method on 19 jan 2021 : " );
 
                                 //if the navigation is active then only make a recursive call
                                 if(isNavigationStarted && isFragmentDestroyed == false) {
@@ -1013,7 +1016,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         try {
             islocationControlEnabled = true;
             if (SourceNode != null && DestinationNode != null) {
-                if (mMap != null && isNavigationStarted && islocationControlEnabled) {
+                if (mMap != null && isNavigationStarted) {
                     isNavigationStarted = false;
                     islocationControlEnabled = false;
                     //  Log.e("STOP NAVIGATION", "STOP NAVIGATION INNER VALUE --"+ islocationControlEnabled);
@@ -1060,13 +1063,15 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
     @Override
     public void onDestroy() {
-        super.onDestroy();
+
         isFragmentDestroyed = true;
         if (textToSpeech != null) {
             textToSpeech.shutdown();
             textToSpeech = null;
         }
-        myReceiver=null;
+        myReceiver = null;
+        super.onDestroy();
+        Log.e("ON DESTROY"," NSGI MAP FRAGMENT ACTIVITY ");
 //        if (mFusedLocationClient != null) {
 //            stopLocationUpdates();
 //            mFusedLocationClient = null;
@@ -1088,7 +1093,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         String[] DestinationCordinates = destinationData.split(",");
         for (int p = 0; p < DestinationCordinates.length; p++) {
             // Log.e("DestinationData","Destination Data" + DestinationCordinates[p]);
-            String dest_data = DestinationCordinates[p].toString();
+            String dest_data = DestinationCordinates[p];
             String[] dest_latLngs = dest_data.split(" ");
             double dest_lat = Double.parseDouble(dest_latLngs[0]);
             double dest_lang = Double.parseDouble(dest_latLngs[1]);
@@ -1100,180 +1105,12 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
 
-    public LatLng reverseCoordinate(LatLng point) {
-        return new LatLng(point.longitude, point.latitude);
-    }
-
-    public List<LatLng> reverseCoordinates(List<LatLng> points) {
-        List<LatLng> pointReversed = new ArrayList<>();
-        for (LatLng point : points) {
-            pointReversed.add(reverseCoordinate(point));
-        }
-        return pointReversed;
-        // return points.stream().map( elem -> reverseCoordinate(elem)).collect(Collectors.toList());
-        //return new LatLng(point.longitude, point.latitude)
-    }
-
-    public LatLng cloneCoordinate(LatLng point) {
-        if (point == null) return null;
-        return new LatLng(point.latitude, point.longitude);
-    }
-
-    public List<LatLng> cloneCoordinates(List<LatLng> points) {
-        List<LatLng> pointReversed = new ArrayList<>();
-        for (LatLng point : points) {
-            pointReversed.add(cloneCoordinate(point));
-        }
-        return pointReversed;
-        // return points.stream().map( elem -> reverseCoordinate(elem)).collect(Collectors.toList());
-        //return new LatLng(point.longitude, point.latitude)
-    }
-
-    public double calculateDistanceAlongLine(List<LatLng> polyline, LatLng from, LatLng to) {
-        double distanceA = calculateDistanceAlongLineFromStart(polyline, from);
-        double distanceB = calculateDistanceAlongLineFromStart(polyline, to);
-        return (distanceB - distanceA);
-    }
-
-    private double calculateDistanceAlongLineFromStart(List<LatLng> polyline, LatLng position) {
-        double distance = 0d;
-
-        if (!PolyUtil.isLocationOnPath(position, polyline, false)) {
-            position = findNearestPointOnLine(polyline, position);
-        }
 
 
-        if (isSameCoordinate(position, polyline.get(0))) {
-            return 0.0d;
-        } else if (isSameCoordinate(position, polyline.get(polyline.size() - 1))) {
-            return SphericalUtil.computeLength(polyline);
-        }
-
-        for (int i = 0; i < polyline.size() - 1; i++) {
-            LatLng pointA = polyline.get(i);
-            LatLng pointB = polyline.get(i + 1);
-
-            if (PolyUtil.isLocationOnPath(position, Arrays.asList(pointA, pointB), false)) {
-                distance += SphericalUtil.computeDistanceBetween(pointA, position);
-                break;
-            } else {
-                distance += SphericalUtil.computeDistanceBetween(pointA, pointB);
-            }
-        }
-
-        return distance;
-    }
-
-    public List<List<LatLng>> splitLineByPoint(List<LatLng> polyline, LatLng position) {
-
-        LatLng nearestPoint = null;
-        List<List<LatLng>> data = new ArrayList<>();
-
-        List<LatLng> listA = new ArrayList<>();
-        List<LatLng> listB = new ArrayList<>();
-
-        List<LatLng> nearestEdge = new ArrayList<>();
-
-        if (polyline.size() < 2) {
-            data.add(cloneCoordinates(polyline));
-            return data;
-        }
-
-        if (polyline.size() == 2) {
-            nearestPoint = findNearestPoint(position, polyline.get(0), polyline.get(1));
-
-            if (isSameCoordinate(nearestPoint, polyline.get(0)) || isSameCoordinate(nearestPoint, polyline.get(1))) {
-                data.add(cloneCoordinates(polyline));
-            } else {
-                data.add(Arrays.asList(cloneCoordinate(polyline.get(0)), nearestPoint));
-                data.add(Arrays.asList(nearestPoint, cloneCoordinate(polyline.get(1))));
-            }
-
-        } else {
-            // polyline size is more than 2
-            double smallestDistance = 0;
-            int closestPointIndex = 0;
-            for (int i = 1; i < polyline.size(); i++) {
-                LatLng localNearestPoint = findNearestPoint(position, polyline.get(i - 1), polyline.get(i));
-                double distance = SphericalUtil.computeDistanceBetween(localNearestPoint, position);
-                if (i == 1) {
-                    // for the first iteration we assigning the value to smallestDistance directly
-                    smallestDistance = distance;
-                    nearestPoint = localNearestPoint;
-
-                    nearestEdge.add(polyline.get(i - 1));
-                    nearestEdge.add(polyline.get(i));
-                    closestPointIndex = i;
-
-                } else if (distance < smallestDistance) {
-                    smallestDistance = distance;
-                    nearestPoint = localNearestPoint;
-
-                    nearestEdge.clear();
-                    nearestEdge.add(polyline.get(i - 1));
-                    nearestEdge.add(polyline.get(i));
-                    closestPointIndex = i;
-                }
-            }
-
-            // from start point to the closest index
-            listA.addAll(cloneCoordinates(polyline.subList(0, closestPointIndex)));
-            listA.add(cloneCoordinate(nearestPoint));
-
-            // from the closest index to end of list
-            listB.add(cloneCoordinate(nearestPoint));
-            listB.addAll(cloneCoordinates(polyline.subList(closestPointIndex, polyline.size())));
-
-            data.add(listA);
-            data.add(listB);
-        }
-
-        return data;
-    }
 
 
-    public LatLng findNearestPointOnLine(List<LatLng> polyline, LatLng position) {
 
-        LatLng nearestPoint = null;
-        List<LatLng> nearestEdge = new ArrayList<>();
 
-        if (polyline.size() < 2) {
-            //TODO need to check
-            return polyline.get(0);
-        }
-
-        if (polyline.size() == 2) {
-            nearestPoint = findNearestPoint(position, polyline.get(0), polyline.get(1));
-        } else {
-            // polyline size is more than 2
-            double smallestDistance = 0;
-            for (int i = 1; i < polyline.size(); i++) {
-                LatLng localNearestPoint = findNearestPoint(position, polyline.get(i - 1), polyline.get(i));
-                double distance = SphericalUtil.computeDistanceBetween(localNearestPoint, position);
-                if (i == 1) {
-                    // for the first iteration we assigning the value to smallestDistance directly
-                    smallestDistance = distance;
-                    nearestPoint = localNearestPoint;
-
-                    nearestEdge.add(polyline.get(i - 1));
-                    nearestEdge.add(polyline.get(i));
-                } else if (distance < smallestDistance) {
-                    smallestDistance = distance;
-                    nearestPoint = localNearestPoint;
-
-                    nearestEdge.add(polyline.get(i - 1));
-                    nearestEdge.add(polyline.get(i));
-                }
-            }
-
-        }
-
-        // Log.e(" -- -- polyline: ", polyline.toString());
-        // Log.e(" -- -- position: ", position.toString());
-        // Log.e(" -- -- nearestPoint: ", nearestPoint.toString());
-
-        return nearestPoint;
-    }
 
 
     public String displayNavigationMessage(final LatLng currentPosition) {
@@ -1440,69 +1277,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
 
-    /**
-     * @param oldRoute       previous route data
-     * @param newRoute       route data got from the server
-     * @param deviationPoint point in which the route API request is send and successfully received
-     * @return new list of LatLng merging both list of coordinates, considering the deviationPoint
-     */
-    public List<LatLng> mergeRoutes(List<LatLng> oldRoute, List<LatLng> newRoute, LatLng deviationPoint) {
-        List<LatLng> mergedRoute = new ArrayList<>();
 
-        if (oldRoute == null || oldRoute.size() == 0) {
-            return cloneCoordinates(newRoute);
-        }
-
-        if (newRoute == null
-                || deviationPoint == null
-                || newRoute.size() == 0) {
-            return mergedRoute;
-        }
-
-        // find perpendicular point on old route from deviationPoint
-        LatLng perpendicularPoint = findNearestPointOnLine(oldRoute, deviationPoint);
-
-        // add the first point of old route
-        mergedRoute.add(oldRoute.get(0));
-
-        //truncate the old route till perpendicular point
-        for (int i = 1; i < oldRoute.size(); i++) {
-            LatLng previousPoint = oldRoute.get(i - 1);
-            LatLng currentPoint = oldRoute.get(i);
-
-
-//            double distanceA = SphericalUtil.computeDistanceBetween(previousPoint, perpendicularPoint);
-//            double distanceB = SphericalUtil.computeDistanceBetween(previousPoint, currentPoint);
-//
-//            if (distanceB > distanceA) {
-//                // we found the position
-//                mergedRoute.add(perpendicularPoint);
-//                break;
-//            }
-
-            if (PolyUtil.isLocationOnPath(perpendicularPoint, Arrays.asList(previousPoint, currentPoint), false)) {
-                // we found the position
-                mergedRoute.add(perpendicularPoint);
-                break;
-            }
-
-            // no need else as we breaking the loop
-            mergedRoute.add(currentPoint);
-        }
-
-        // add deviation point
-        mergedRoute.add(deviationPoint);
-        // add the new route coordinates
-        mergedRoute.addAll(cloneCoordinates(newRoute));
-
-//        Log.e("MERGE_ROUTE", "oldRoute " + reverseCoordinates(oldRoute).toString());
-//        Log.e("MERGE_ROUTE", "newRoute " + reverseCoordinates(newRoute).toString());
-//        Log.e("MERGE_ROUTE", "deviationPoint " + reverseCoordinate(deviationPoint).toString());
-//        Log.e("MERGE_ROUTE", "perpendicularPoint " + reverseCoordinate(perpendicularPoint).toString());
-//        Log.e("MERGE_ROUTE", "mergedRoute " + reverseCoordinates(mergedRoute).toString());
-
-        return mergedRoute;
-    }
 
     //@RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
 
@@ -1679,23 +1454,9 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         }
     }
 
-    public int getRandomNumberInRange(int min, int max) {
 
-        if (min >= max) {
-            throw new IllegalArgumentException("max must be greater than min");
-        }
 
-        Random r = new Random();
-        return r.nextInt((max - min) + 1) + min;
-    }
 
-    public BigDecimal truncateDecimal(double x, int numberOfDecimals) {
-        if (x > 0) {
-            return new BigDecimal(String.valueOf(x)).setScale(numberOfDecimals, BigDecimal.ROUND_FLOOR);
-        } else {
-            return new BigDecimal(String.valueOf(x)).setScale(numberOfDecimals, BigDecimal.ROUND_CEILING);
-        }
-    }
 
     public void compareDeviatedRouteWithCurrentRoute(List<LatLng> currentRoute, List<LatLng> deviatedRoute) {
 
@@ -1771,7 +1532,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 param1 = params[0];
                 param2 = params[1];
                 if (httpRequestFlag == false) {
-                    return HttpPost(routeDeviatedDT_URL, param1, param2);
+                    return HttpPost(routeDeviatedDT_URL, param1, param2, AuthorisationKey);
                 }
             } catch (Exception e) {
                 Log.e("doInBackground", e.getMessage(), e);
@@ -1843,73 +1604,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
     }
 
-    private String HttpPost(String myUrl, String latLng1, String latLng2) throws IOException, JSONException {
-        StringBuilder sb = new StringBuilder();
-        String LoginResponse = "";
-        String result = "";
-        URL url = new URL(myUrl);
-        Log.v("URL ", " URL: " + url);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("POST");
-        conn.setRequestProperty("Content-Type", "application/json");
-        conn.setRequestProperty("Accept", "text/plain");
-        JSONObject jsonObject = buidJsonObject(latLng1, latLng2);
-        Log.e("JSON OBJECT", "JSON OBJECT ------- " + jsonObject);
-        setPostRequestContent(conn, jsonObject);
-        conn.connect();
-        result = conn.getResponseMessage();
-        if (conn.getResponseCode() != 200) {
 
-        } else {
-            BufferedReader br = new BufferedReader(new InputStreamReader((conn.getInputStream())));
-            String output = null;
-            //   System.out.println("Output from Server .... \n");
-            while ((output = br.readLine()) != null) {
-                System.out.println(output);
-                LoginResponse = sb.append(output).append(" ").toString();
-
-            }
-        }
-        conn.disconnect();
-        return LoginResponse;
-    }
-
-    private JSONObject buidJsonObject(String latLng1, String latLng2) throws JSONException {
-        JSONObject buidJsonObject = new JSONObject();
-        buidJsonObject.accumulate("UserData", buidJsonObject1());
-        buidJsonObject.accumulate("StartNode", latLng1);
-        buidJsonObject.accumulate("EndNode", latLng2);
-        return buidJsonObject;
-    }
-
-    private JSONObject buidJsonObject1() throws JSONException {
-        JSONObject buidJsonObject1 = new JSONObject();
-        buidJsonObject1.accumulate("username", "admin");
-        buidJsonObject1.accumulate("password", "admin");
-        buidJsonObject1.accumulate("License", AuthorisationKey);
-
-        return buidJsonObject1;
-    }
-
-    private void setPostRequestContent(HttpURLConnection conn,
-                                       JSONObject jsonObject) throws IOException {
-        OutputStream os = conn.getOutputStream();
-        BufferedWriter writer = new BufferedWriter(new OutputStreamWriter(os, "UTF-8"));
-        writer.write(jsonObject.toString());
-        // Log.i(LoginActivity.class.toString(), jsonObject.toString());
-        writer.flush();
-        writer.close();
-        os.close();
-    }
-
-
-    private void removeDuplicatesRouteDeviated(List<LatLng> listOfPoint) {
-        List<LatLng> newData = removeDuplicates(listOfPoint);
-        if (newData.size() < listOfPoint.size()) {
-            listOfPoint.clear();
-            listOfPoint.addAll(newData);
-        }
-    }
 
     public static void animateMarker(final LatLng startPosition, final LatLng destination, final Marker marker) {
         if (marker != null) {
@@ -1948,15 +1643,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
     }
 
-    public List<LatLng> createPointBuffer(LatLng origin, float bufferDistance) {
 
-        List<LatLng> points = new ArrayList<>();
-        for (int i = 0; i <= 360; i += 45) {
-            points.add(SphericalUtil.computeOffsetOrigin(origin, bufferDistance, i));
-        }
-        points.add(points.get(points.size() - 1));
-        return points;
-    }
 
     public void alertDestination(LatLng currentGpsPosition) {
 
@@ -1999,14 +1686,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
 
-    public boolean pointWithinPolygon(LatLng destinationPt, List<LatLng> destinationPtsList) {
-        boolean geofenceValue = false;
-        if (destinationPtsList != null && destinationPtsList.size() > 0) {
-            geofenceValue = PolyUtil.containsLocation(destinationPt, destinationPtsList, false);
-        }
 
-        return geofenceValue;
-    }
 
     private void sendData(String comm, int AlertType) {
 
@@ -2026,198 +1706,10 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
     }
 
-    private interface LatLngInterpolator {
-        LatLng interpolate(float fraction, LatLng a, LatLng b);
-
-        class LinearFixed implements LatLngInterpolator {
-            @Override
-            public LatLng interpolate(float fraction, LatLng a, LatLng b) {
-                double lat = (b.latitude - a.latitude) * fraction + a.latitude;
-                double lngDelta = b.longitude - a.longitude;
-                // Take the shortest path across the 180th meridian.
-                if (Math.abs(lngDelta) > 180) {
-                    lngDelta -= Math.signum(lngDelta) * 360;
-                }
-                double lng = lngDelta * fraction + a.longitude;
-                return new LatLng(lat, lng);
-            }
-        }
-    }
 
 
-    private static float computeRotation(float fraction, float start, float end) {
-        float normalizeEnd = end - start; // rotate start to 0
-        float normalizedEndAbs = (normalizeEnd + 360) % 360;
-
-        float direction = (normalizedEndAbs > 180) ? -1 : 1; // -1 = anticlockwise, 1 = clockwise
-        float rotation;
-        if (direction > 0) {
-            rotation = normalizedEndAbs;
-        } else {
-            rotation = normalizedEndAbs - 360;
-        }
-
-        float result = fraction * rotation + start;
-        return (result + 360) % 360;
-    }
 
 
-    private List<EdgeDataT> getAllEdgesData_NotUsing() {
-        String query = "SELECT * FROM " + EdgeDataT.TABLE_NAME;
-        //Cursor c1 = sqlHandler.selectQuery(query);
-        //edgeDataList = (List<EdgeDataT>) SqlHandler.getDataRows(EdgeDataT.MAPPING, EdgeDataT.class, c1);
-        //sqlHandler.closeDataBaseConnection();
-        return edgeDataList;
-    }
-
-    private boolean isSameCoordinate(LatLng pointA, LatLng pointB) {
-
-        if (pointA == null || pointB == null) {
-            return false;
-        }
-
-        String latPointA = truncateDecimal(pointA.latitude, 8).toString();
-        String lngPointA = truncateDecimal(pointA.longitude, 8).toString();
-
-        String latPointB = truncateDecimal(pointB.latitude, 8).toString();
-        String lngPointB = truncateDecimal(pointB.longitude, 8).toString();
-
-        return latPointA.equals(latPointB) && lngPointA.equals(lngPointB);
-    }
-
-    // modified by SKC
-    private List<LatLng> removeDuplicates(List<LatLng> pointList) {
-
-        List<LatLng> newList = new ArrayList<>();
-
-        if (pointList.size() == 0) {
-            return newList;
-        }
-        newList.add(pointList.get(0));
-
-        for (int i = 1; i < pointList.size(); i++) {
-            if (!isSameCoordinate(pointList.get(i), pointList.get(i - 1))) {
-                newList.add(pointList.get(i));
-            }
-        }
-
-        return newList;
-    }
-
-    public static double distFrom(double lat1, double lng1, double lat2, double lng2) {
-        double earthRadius = 6371000; //meters
-        double dLat = Math.toRadians(lat2 - lat1);
-        double dLng = Math.toRadians(lng2 - lng1);
-        double a = sin(dLat / 2) * sin(dLat / 2) +
-                cos(Math.toRadians(lat1)) * cos(Math.toRadians(lat2)) *
-                        sin(dLng / 2) * sin(dLng / 2);
-        double c = 2 * atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        double dist = (float) (earthRadius * c);
-        return dist;
-    }
-
-    private void setEstimatedTime(List<LatLng> points) {
-        estimatedTimeInSeconds = (int) (SphericalUtil.computeLength(points) * (3600f / (NSGIMapFragmentActivity.AVERAGE_SPEED * 1000))); //30 km/hr
-    }
-
-    private Set<Object> getKeysFromValue(Map<String, String> map, String key) {
-        Set<Object> keys = new HashSet<Object>();
-        for (Map.Entry<String, String> entry : map.entrySet()) {
-            //if value != null
-            if (entry.getKey().equals(key)) {
-                keys.add(entry.getValue());
-            }
-        }
-        return keys;
-    }
-
-    private void getValidRouteData_NotUsing() throws JSONException {
-        if (edgeDataList != null && edgeDataList.size() > 0) {
-            currentRouteData = new ArrayList<LatLng>();
-            List AllPointsList = new ArrayList();
-            AllPointEdgeNo = new HashMap<>();
-            AllPointEdgeDistaces = new HashMap<>();
-            EdgeContainsDataList = new ArrayList<EdgeDataT>();
-            for (int i = 0; i < edgeDataList.size(); i++) {
-                EdgeDataT edge = new EdgeDataT(); //creating object for EDGETABLE
-                edge = edgeDataList.get(i);
-                int edgeNo = edge.getEdgeNo(); //Edge Number
-                String stPoint = edge.getStartPoint(); //Start Point
-                String endPoint = edge.getEndPoint();//End Point
-                String points = edge.getAllPoints(); // All points in the edge
-                JSONArray pointArray = new JSONArray(points);
-                String geometryText = edge.getGeometryText();
-                String distanceInEdge = edge.getDistanceInVertex();
-//                TotalDistance = edge.getTotaldistance();
-                if (points != null && pointArray.length() > 0) {
-
-                    for (int j = 0; j < pointArray.length(); j++) {
-                        JSONArray localPoint = pointArray.getJSONArray(j);
-
-                        double Lat = localPoint.getDouble(0);
-                        double Lang = localPoint.getDouble(1);
-                        PointData = new LatLng(Lat, Lang);
-                        AllPointEdgeNo.put(String.valueOf(PointData), geometryText);
-                        AllPointEdgeDistaces.put(String.valueOf(PointData), distanceInEdge);
-
-                        PointData = new LatLng(Lang, Lat);
-                        EdgeDataT edgePointData = new EdgeDataT(stPoint, endPoint, String.valueOf(PointData), geometryText, distanceInEdge);
-                        EdgeContainsDataList.add(edgePointData);
-
-                        currentRouteData.add(new LatLng(Lat, Lang));
-                    }
-                }
-            }
-
-            for (int k = 0; k < EdgeContainsDataList.size(); k++) {
-                EdgeDataT edgeK = EdgeContainsDataList.get(k);
-                StringBuilder sb = new StringBuilder();
-                sb.append("STPOINT :" + edgeK.getStartPoint() + "EndPt:" + edgeK.getEndPoint() + "Points:" + edgeK.getPositionMarkingPoint() + "Geometry TEXT:" + edgeK.getGeometryText());
-            }
-
-        }
-        //Getting Positions of Source and destinations
-        LatLng sr_data = currentRouteData.get(0);
-        double x_sr = sr_data.latitude;
-        double y_sr = sr_data.longitude;
-        SourceNode = new LatLng(y_sr, x_sr);
-        Log.e("SourceNode", "SourceNode" + SourceNode);
-
-        LatLng de_data = currentRouteData.get(currentRouteData.size() - 1);
-        double x_de = de_data.latitude;
-        double y_de = de_data.longitude;
-        DestinationNode = new LatLng(y_de, x_de);
-        Log.e("DestinationNode", "DestinationNode" + DestinationNode);
-
-        Log.e("frst-currentRouteData:", currentRouteData.toString());
-
-    }
-
-    private LatLng findNearestPoint(final LatLng p, final LatLng start, final LatLng end) {
-        if (start.equals(end)) {
-            return start;
-        }
-        final double s0lat = Math.toRadians(p.latitude);
-        final double s0lng = Math.toRadians(p.longitude);
-        final double s1lat = Math.toRadians(start.latitude);
-        final double s1lng = Math.toRadians(start.longitude);
-        final double s2lat = Math.toRadians(end.latitude);
-        final double s2lng = Math.toRadians(end.longitude);
-
-        double s2s1lat = s2lat - s1lat;
-        double s2s1lng = s2lng - s1lng;
-        final double u = ((s0lat - s1lat) * s2s1lat + (s0lng - s1lng) * s2s1lng)
-                / (s2s1lat * s2s1lat + s2s1lng * s2s1lng);
-        if (u <= 0) {
-            return start;
-        }
-        if (u >= 1) {
-            return end;
-        }
-
-        return new LatLng(start.latitude + (u * (end.latitude - start.latitude)),
-                start.longitude + (u * (end.longitude - start.longitude)));
-    }
 
     public void addMarkers() {
         if (SourceNode != null && DestinationNode != null) {
@@ -2385,42 +1877,13 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
     }
 
-
-    private BitmapDescriptor bitmapDescriptorFromVector(Context context, int vectorResId) {
-        Drawable vectorDrawable = ContextCompat.getDrawable(context, vectorResId);
-        vectorDrawable.setBounds(10, 0, vectorDrawable.getIntrinsicWidth(), vectorDrawable.getIntrinsicHeight());
-        Bitmap bitmap = Bitmap.createBitmap(vectorDrawable.getIntrinsicWidth(), vectorDrawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        vectorDrawable.draw(canvas);
-        return BitmapDescriptorFactory.fromBitmap(bitmap);
-    }
-
-    private double showDistance(LatLng latlng1, LatLng latLng2) {
-        double distance = SphericalUtil.computeDistanceBetween(latlng1, latLng2);
-        return distance;
-    }
-
-    @RequiresApi(api = Build.VERSION_CODES.KITKAT)
-    List resultList = new ArrayList();
-
-    public void InsertAllRouteData(String stNode, String destNode, String routeData) {
-
-        StringBuilder query = new StringBuilder("INSERT INTO ");
-        query.append(RouteT.TABLE_NAME).append("(startNode,endNode,routeData) values (")
-                .append("'").append(stNode).append("',")
-                .append("'").append(destNode).append("',")
-                .append("'").append(routeData).append("')");
-        Log.e("query", " INSERTION query--" + query);
-        //sqlHandler.executeQuery(query.toString());
-        //sqlHandler.closeDataBaseConnection();
-    }
-
-
     private boolean checkPermission() {
-        int result = ContextCompat.checkSelfPermission(getContext(), ACCESS_FINE_LOCATION);
-        int result1 = ContextCompat.checkSelfPermission(getContext(), READ_EXTERNAL_STORAGE);
-
-        return true;
+//        int result = ContextCompat.checkSelfPermission(getContext(), ACCESS_FINE_LOCATION);
+//        int result1 = ContextCompat.checkSelfPermission(getContext(), READ_EXTERNAL_STORAGE);
+//
+//        return true;
+        return PackageManager.PERMISSION_GRANTED == ContextCompat.checkSelfPermission(getContext(), ACCESS_FINE_LOCATION) &&
+                    PackageManager.PERMISSION_GRANTED == ContextCompat.checkSelfPermission(getContext(), READ_EXTERNAL_STORAGE);
     }
 
     private void requestPermission() {
@@ -2504,82 +1967,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
 
-    @SuppressLint("MissingPermission")
-    private LatLng getLocation() {
-
-        if (isContinue) {
-            // Log.v("APP DATA","checking IF ic continue "+isContinue);
-            if (mFusedLocationClient != null && locationRequest != null && locationCallback != null) {
-                mFusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null);
-            }
-
-            if(mFusedLocationClient == null) {
-                return currentGPSPosition;
-            }
-
-            // Log.v("APP DATA","checking IF ");
-            mFusedLocationClient.getLastLocation().addOnSuccessListener(getActivity(), new OnSuccessListener<Location>() {
-                @Override
-                public void onSuccess(Location location) {
-                    //  Log.v("APP DATA","LOCATION NULL");
-                    //   Log.v("APP DATA","checking else ic continue "+isContinue);
-                    if (location != null) {
-                        wayLatitude = location.getLatitude();
-                        wayLongitude = location.getLongitude();
-                        currentGPSPosition = new LatLng(wayLatitude, wayLongitude);
-                        Log.e("LOCATION CALLBACK","LOCATION CALLBACK GET LOCATION METHOD LAT-- 09-JAN-2021"+wayLatitude);
-
-                        Log.e("LOCATION CALLBACK","LOCATION CALLBACK GET LOCATION METHOD LONG-- 09-JAN-2021"+wayLongitude);
-
-                        Log.e("LOCATION CALLBACK","LOCATION CALLBACK GET LOCATION METHOD -- 09-JAN-2021"+currentGPSPosition);
-
-
-                        //just for trail
-                        String S = String.valueOf(location.getLatitude());
-                        // Log.v("APP DATA",""+S);
-                        Log.e("latitude FROM SERVICE",location.getLatitude()+"");
-                        Log.e("longitude FROM SERVICE",location.getLongitude()+"");
-                        //txtLocation.setText(String.format(Locale.US, "%s - %s", wayLatitude, wayLongitude));
-
-                        Log.d("TAG", "location DATA ........" + "CURRENT GPS POSITION : " + wayLatitude + "," + wayLongitude);
-                    } else {
-                        mFusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null);
-                    }
-                }
-            });
-
-        } else {
-
-            if(mFusedLocationClient == null) {
-                return currentGPSPosition;
-            }
-
-            mFusedLocationClient.getLastLocation().addOnSuccessListener(getActivity(), new OnSuccessListener<Location>() {
-                @Override
-                public void onSuccess(Location location) {
-                    //  Log.v("APP DATA","LOCATION NULL");
-                    //   Log.v("APP DATA","checking else ic continue "+isContinue);
-                    if (location != null) {
-                        wayLatitude = location.getLatitude();
-                        wayLongitude = location.getLongitude();
-                        //just for trail
-                        String S = String.valueOf(location.getLatitude());
-                        // Log.v("APP DATA",""+S);
-                        // Log.e("latitude FROM SERVICE",location.getLatitude()+"");
-                        //  Log.e("longitude FROM SERVICE",location.getLongitude()+"");
-                        //txtLocation.setText(String.format(Locale.US, "%s - %s", wayLatitude, wayLongitude));
-
-                        Log.d("TAG", "location DATA ........" + "CURRENT GPS POSITION : " + wayLatitude + "," + wayLongitude);
-                    } else {
-                        mFusedLocationClient.requestLocationUpdates(locationRequest, locationCallback, null);
-                    }
-                }
-            });
-        }
-        //  }
-        return currentGPSPosition;
-    }
-
     @Override
     public void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -2597,7 +1984,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         final Interpolator interpolator = new LinearInterpolator();
         // set car bearing for current part of path
 
-        float angleDeg = (float) (180 * getAngle(beginLatLng, endLatLng) / Math.PI);
+        float angleDeg = (float) (180 * Utils.getAngle(beginLatLng, endLatLng) / Math.PI);
         Matrix matrix = new Matrix();
         matrix.postRotate(angleDeg);
         // marker.setIcon(BitmapDescriptorFactory.fromBitmap(Bitmap.createBitmap(mMarkerIcon, 0, 0,mMarkerIcon.getWidth(), mMarkerIcon.getHeight(), matrix, true)));
@@ -2628,7 +2015,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 location.setLongitude(endLatLng.longitude);
                 float bearingMap = location.getBearing();
                 //  float bearingMap= mMap.getCameraPosition().bearing;
-                float bearing = (float) bearingBetweenLocations(beginLatLng, endLatLng);
+                float bearing = (float) Utils.bearingBetweenLocations(beginLatLng, endLatLng);
                 float angle = -azimuthInDegress + bearing;
                 float rotation = -azimuthInDegress * 360 / (2 * 3.14159f);
                 double lng = lngDelta * t + beginLatLng.longitude;
@@ -2645,8 +2032,8 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 if (t < 1.0) {
                     handler.postDelayed(this, 16);
                 } else {
-                    float beginAngle = (float) (90 * getAngle(beginLatLng, endLatLng) / Math.PI);
-                    float endAngle = (float) (90 * getAngle(currentGpsPosition, endLatLng) / Math.PI);
+                    float beginAngle = (float) (90 * Utils.getAngle(beginLatLng, endLatLng) / Math.PI);
+                    float endAngle = (float) (90 * Utils.getAngle(currentGpsPosition, endLatLng) / Math.PI);
                     computeRotation(10, beginAngle, endAngle);
                 }
             }
@@ -2658,7 +2045,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         final long startTime = SystemClock.uptimeMillis();
         final Interpolator interpolator = new LinearInterpolator();
         // set car bearing for current part of path
-        float angleDeg = (float) (180 * getAngle(beginLatLng, endLatLng) / Math.PI);
+        float angleDeg = (float) (180 * Utils.getAngle(beginLatLng, endLatLng) / Math.PI);
         Matrix matrix = new Matrix();
         matrix.postRotate(angleDeg);
         // marker.setIcon(BitmapDescriptorFactory.fromBitmap(Bitmap.createBitmap(mMarkerIcon, 0, 0,mMarkerIcon.getWidth(), mMarkerIcon.getHeight(), matrix, true)));
@@ -2667,6 +2054,14 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
             @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
             @Override
             public void run() {
+
+                if(isLieInGeofence || isFragmentDestroyed) {
+                    Log.e("Animate marker","Animate marker destination alert in if "+ isLieInGeofence);
+                    handler.removeCallbacks(this);
+                }else {
+                    Log.e("Animate marker", "Animate marker destination alert in else" + isLieInGeofence);
+                }
+
                 // calculate phase of animation
                 long elapsed = SystemClock.uptimeMillis() - startTime;
                 float t = interpolator.getInterpolation((float) elapsed / duration);
@@ -2681,7 +2076,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 location.setLongitude(endLatLng.longitude);
                 float bearingMap = location.getBearing();
                 //  float bearingMap= mMap.getCameraPosition().bearing;
-                float bearing = (float) bearingBetweenLocations(beginLatLng, endLatLng);
+                float bearing = (float) Utils.bearingBetweenLocations(beginLatLng, endLatLng);
                 float angle = -azimuthInDegress + bearing;
                 float rotation = -azimuthInDegress * 360 / (2 * 3.14159f);
                 double lng = lngDelta * t + beginLatLng.longitude;
@@ -2700,37 +2095,15 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 if (t < 1.0) {
                     handler.postDelayed(this, 16);
                 } else {
-                    float beginAngle = (float) (90 * getAngle(beginLatLng, endLatLng) / Math.PI);
-                    float endAngle = (float) (90 * getAngle(currentGpsPosition, endLatLng) / Math.PI);
+                    float beginAngle = (float) (90 * Utils.getAngle(beginLatLng, endLatLng) / Math.PI);
+                    float endAngle = (float) (90 * Utils.getAngle(currentGpsPosition, endLatLng) / Math.PI);
                     computeRotation(10, beginAngle, endAngle);
                 }
             }
         });
     }
 
-    private double bearingBetweenLocations(LatLng latLng1, LatLng latLng2) {
-        double PI = 3.14159;
-        double lat1 = latLng1.latitude * PI / 180;
-        double long1 = latLng1.longitude * PI / 180;
-        double lat2 = latLng2.latitude * PI / 180;
-        double long2 = latLng2.longitude * PI / 180;
-        double dLon = (long2 - long1);
-        double y = sin(dLon) * cos(lat2);
-        double x = cos(lat1) * sin(lat2) - sin(lat1)
-                * cos(lat2) * cos(dLon);
-        double brng = atan2(y, x);
-        brng = Math.toDegrees(brng);
-        brng = (brng + 360) % 360;
-        return brng;
-    }
 
-    private static double getAngle(LatLng beginLatLng, LatLng endLatLng) {
-
-        double f1 = Math.PI * beginLatLng.latitude / 180;
-        double f2 = Math.PI * endLatLng.latitude / 180;
-        double dl = Math.PI * (endLatLng.longitude - beginLatLng.longitude) / 180;
-        return atan2(sin(dl) * cos(f2), cos(f1) * sin(f2) - sin(f1) * cos(f2) * cos(dl));
-    }
 
     public void writeLogFile() {
         if (isExternalStorageWritable()) {
