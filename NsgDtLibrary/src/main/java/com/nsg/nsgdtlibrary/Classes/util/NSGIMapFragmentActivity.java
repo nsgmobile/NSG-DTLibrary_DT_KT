@@ -248,10 +248,12 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     public NSGIMapFragmentActivity(String BASE_MAP_URL_FORMAT) {
         this.BASE_MAP_URL_FORMAT = BASE_MAP_URL_FORMAT;
     }
-
+/*
     public static NSGIMapFragmentActivity getInstance(String BASE_MAP_URL_FORMAT, String stNode, String endNode, String routeData, int routeDeviationBuffer, String routeDeviatedDT_URL, String AuthorisationKey, String geoFenceCoordinates, boolean isWriteLogFile) {
         return new NSGIMapFragmentActivity(BASE_MAP_URL_FORMAT,stNode,endNode,routeData,routeDeviationBuffer,routeDeviatedDT_URL,AuthorisationKey,geoFenceCoordinates,isWriteLogFile);
     }
+
+ */
 
     @SuppressLint("ValidFragment")
     public NSGIMapFragmentActivity(String BASE_MAP_URL_FORMAT, String stNode, String endNode, String routeData, int routeDeviationBuffer, String routeDeviatedDT_URL, String AuthorisationKey, String GeoFenceCordinates, boolean isWriteLogFile) {
