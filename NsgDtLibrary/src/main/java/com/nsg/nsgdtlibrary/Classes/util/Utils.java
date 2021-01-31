@@ -77,7 +77,6 @@ class Utils {
         if(beginLatLng == null || endLatLng == null) {
             return 0d;
         }
-
         double f1 = Math.PI * beginLatLng.latitude / 180;
         double f2 = Math.PI * endLatLng.latitude / 180;
         double dl = Math.PI * (endLatLng.longitude - beginLatLng.longitude) / 180;
@@ -85,11 +84,6 @@ class Utils {
     }
 
     static double bearingBetweenLocations(LatLng latLng1, LatLng latLng2) {
-
-        if(latLng1 == null || latLng2 == null) {
-            return 0d;
-        }
-
         double PI = 3.14159;
         double lat1 = latLng1.latitude * PI / 180;
         double long1 = latLng1.longitude * PI / 180;
@@ -106,9 +100,6 @@ class Utils {
     }
 
     static double showDistance(LatLng latLng1, LatLng latLng2) {
-        if(latLng1 == null || latLng2 == null) {
-            return 0d;
-        }
         double distance = SphericalUtil.computeDistanceBetween(latLng1, latLng2);
         return distance;
     }
@@ -126,6 +117,9 @@ class Utils {
     }
 
     static BitmapDescriptor bitmapDescriptorFromVector(Context context, int vectorResId) {
+        if(context == null) {
+            return null;
+        }
         Drawable vectorDrawable = ContextCompat.getDrawable(context, vectorResId);
         vectorDrawable.setBounds(10, 0, vectorDrawable.getIntrinsicWidth(), vectorDrawable.getIntrinsicHeight());
         Bitmap bitmap = Bitmap.createBitmap(vectorDrawable.getIntrinsicWidth(), vectorDrawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
@@ -367,7 +361,7 @@ class Utils {
         LatLng nearestPoint = null;
         List<LatLng> nearestEdge = new ArrayList<>();
 
-        if (polyline.size() < 2) {
+        if (polyline.size() > 0 && polyline.size() < 2) {
             //TODO need to check
             return polyline.get(0);
         }

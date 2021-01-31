@@ -62,7 +62,7 @@ public class LocationUpdatesService extends Service {
     private static final String EXTRA_STARTED_FROM_NOTIFICATION = PACKAGE_NAME +
             ".started_from_notification";
 
-    private final IBinder mBinder = new LocalBinder();
+    private LocalBinder mBinder = new LocalBinder();
 
     /**
      * The desired interval for location updates. Inexact. Updates may be more or less frequent.
@@ -101,7 +101,7 @@ public class LocationUpdatesService extends Service {
     /**
      * Callback for changes in location.
      */
-    private LocationCallback mLocationCallback;
+    private CustomLocationCallback mLocationCallback;
 
     private Handler mServiceHandler;
 
@@ -117,13 +117,7 @@ public class LocationUpdatesService extends Service {
     public void onCreate() {
         mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
 
-        mLocationCallback = new LocationCallback() {
-            @Override
-            public void onLocationResult(LocationResult locationResult) {
-                super.onLocationResult(locationResult);
-                onNewLocation(locationResult.getLastLocation());
-            }
-        };
+        mLocationCallback = new CustomLocationCallback(this);
 
         createLocationRequest();
         getLastLocation();
@@ -131,6 +125,7 @@ public class LocationUpdatesService extends Service {
         HandlerThread handlerThread = new HandlerThread(TAG);
         handlerThread.start();
         mServiceHandler = new Handler(handlerThread.getLooper());
+        mBinder.setService(this);
     }
 
     @Override
@@ -162,7 +157,7 @@ public class LocationUpdatesService extends Service {
         Log.i(TAG, "in onBind()");
         stopForeground(true);
         mChangingConfiguration = false;
-        return mBinder;
+        return (IBinder)mBinder;
     }
 
     @Override
@@ -185,6 +180,11 @@ public class LocationUpdatesService extends Service {
     @Override
     public void onDestroy() {
         mServiceHandler.removeCallbacksAndMessages(null);
+        mLocationCallback.setLocationUpdatesService(null);
+        mLocationCallback = null;
+        mBinder.setService(null);
+        mBinder = null;
+        mServiceHandler = null;
     }
 
     /**
@@ -238,8 +238,8 @@ public class LocationUpdatesService extends Service {
         }
     }
 
-    private void onNewLocation(Location location) {
-        Log.i(TAG, "New location: " + location);
+    void onNewLocation(Location location) {
+        //Log.i(TAG, "New location: " + location);
 
         mLocation = location;
 
@@ -260,15 +260,8 @@ public class LocationUpdatesService extends Service {
         mLocationRequest.setPriority(LocationRequest.PRIORITY_HIGH_ACCURACY);
     }
 
-    /**
-     * Class used for the client Binder.  Since this service runs in the same process as its
-     * clients, we don't need to deal with IPC.
-     */
-    public class LocalBinder extends Binder {
-        LocationUpdatesService getService() {
-            return LocationUpdatesService.this;
-        }
-    }
+
+
 
     /**
      * Returns true if this is a foreground service.

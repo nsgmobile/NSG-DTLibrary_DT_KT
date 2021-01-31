@@ -129,9 +129,9 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     private Circle mCircle = null;
     Bitmap mMarkerIcon;
 
-    private List<LatLng> currentRouteData = new ArrayList<LatLng>();
-    private List<LatLng> currentDeviatedRouteData = new ArrayList<>();
-    private List<LatLng> deviatedRouteData = new ArrayList<>();
+    private final List<LatLng> currentRouteData = new ArrayList<LatLng>();
+    private final List<LatLng> currentDeviatedRouteData = new ArrayList<>();
+    private final List<LatLng> deviatedRouteData = new ArrayList<>();
 
     private List<LatLng> nearestPointValuesList;
     private ImageButton change_map_options, re_center;
@@ -152,11 +152,11 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     private boolean isContinue = true;
     private String GeoFenceCordinates;
     private boolean routeAPIHit = false;
-    List<LatLng> commonPoints = new ArrayList<LatLng>();
-    List<LatLng> uncommonPoints = new ArrayList<LatLng>();
+    final List<LatLng> commonPoints = new ArrayList<LatLng>();
+    final List<LatLng> uncommonPoints = new ArrayList<LatLng>();
 
     //
-    List<Double> consDistList = new ArrayList<>();
+    final List<Double> consDistList = new ArrayList<>();
     List<LatLng> destinationGeoFenceCoordinatesList;
     private boolean isLieInGeofence = false;
     private boolean isContinuoslyOutOfTrack = false;
@@ -214,7 +214,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
             Log.i("service bind", "success");
 
-            LocationUpdatesService.LocalBinder binder = (LocationUpdatesService.LocalBinder) service;
+            LocalBinder binder = (LocalBinder) service;
             locationUpdatesService = binder.getService();
             mBound = true;
             locationUpdatesService.requestLocationUpdates();
@@ -230,8 +230,13 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     };
     private SupportMapFragment mapFragment;
     private AsyncResponse asyncResponse;
-
-
+    private Runnable startNavigationRunnable = null;
+    private Handler startNavigationHandler = null;
+    private Handler animateCarMoveHandler = null;
+    private Runnable animateCarMoveRunnable = null;
+    private Handler animateCarMoveNotUpdateMarkerHandler = null;
+    private Runnable animateCarMoveNotUpdateMarkerRunnable = null;
+    private PopupMenu popup;
 
     //-- new change end
 
@@ -248,12 +253,14 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     public NSGIMapFragmentActivity(String BASE_MAP_URL_FORMAT) {
         this.BASE_MAP_URL_FORMAT = BASE_MAP_URL_FORMAT;
     }
-/*
-    public static NSGIMapFragmentActivity getInstance(String BASE_MAP_URL_FORMAT, String stNode, String endNode, String routeData, int routeDeviationBuffer, String routeDeviatedDT_URL, String AuthorisationKey, String geoFenceCoordinates, boolean isWriteLogFile) {
-        return new NSGIMapFragmentActivity(BASE_MAP_URL_FORMAT,stNode,endNode,routeData,routeDeviationBuffer,routeDeviatedDT_URL,AuthorisationKey,geoFenceCoordinates,isWriteLogFile);
+
+    public static NSGIMapFragmentActivity getInstance(String BASE_MAP_URL_FORMAT) {
+        return new NSGIMapFragmentActivity(BASE_MAP_URL_FORMAT);
     }
 
- */
+    public static NSGIMapFragmentActivity getInstance(String BASE_MAP_URL_FORMAT, String stNode, String endNode, String routeData, int routeDeviationBuffer, String routeDeviatedDT_URL, String AuthorisationKey, String geoFenceCoordinates, boolean isWriteLogFile) {
+        return new NSGIMapFragmentActivity(BASE_MAP_URL_FORMAT, stNode, endNode, routeData, routeDeviationBuffer, routeDeviatedDT_URL, AuthorisationKey, geoFenceCoordinates, isWriteLogFile);
+    }
 
     @SuppressLint("ValidFragment")
     public NSGIMapFragmentActivity(String BASE_MAP_URL_FORMAT, String stNode, String endNode, String routeData, int routeDeviationBuffer, String routeDeviatedDT_URL, String AuthorisationKey, String GeoFenceCordinates, boolean isWriteLogFile) {
@@ -314,6 +321,41 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         super.onPause();
     }
 
+    void startTTS() {
+        final Activity tmpActivity = getActivity();
+        if(tmpActivity != null) {
+            final Context context = tmpActivity.getApplicationContext();
+            if(context != null) {
+                textToSpeech = new TextToSpeech(context, new TextToSpeech.OnInitListener() {
+                    @Override
+                    public void onInit(int status) {
+                        if (status == TextToSpeech.SUCCESS) {
+                            int ttsLang = textToSpeech.setLanguage(Locale.US);
+                            if (ttsLang == TextToSpeech.LANG_MISSING_DATA
+                                    || ttsLang == TextToSpeech.LANG_NOT_SUPPORTED) {
+                                Log.e("TTS", "The Language is not supported!");
+                            } else {
+                                Log.i("TTS", "Language Supported.");
+                            }
+                            Log.i("TTS", "Initialization success.");
+                        } else {
+                            Toast.makeText(getContext(), "TTS Initialization failed!", Toast.LENGTH_SHORT).show();
+                        }
+                    }
+                });
+            }
+        }
+
+    }
+
+    void stopTTS() {
+        if (textToSpeech != null) {
+            textToSpeech.stop();
+            textToSpeech.shutdown();
+            textToSpeech = null;
+        }
+    }
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -322,23 +364,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         myReceiver = new LocationReceiver(this);
 
         //mLocationManager = (LocationManager) getActivity().getSystemService(LOCATION_SERVICE);
-        textToSpeech = new TextToSpeech(getContext(), new TextToSpeech.OnInitListener() {
-            @Override
-            public void onInit(int status) {
-                if (status == TextToSpeech.SUCCESS) {
-                    int ttsLang = textToSpeech.setLanguage(Locale.US);
-                    if (ttsLang == TextToSpeech.LANG_MISSING_DATA
-                            || ttsLang == TextToSpeech.LANG_NOT_SUPPORTED) {
-                        Log.e("TTS", "The Language is not supported!");
-                    } else {
-                        Log.i("TTS", "Language Supported.");
-                    }
-                    Log.i("TTS", "Initialization success.");
-                } else {
-                    Toast.makeText(getContext(), "TTS Initialization failed!", Toast.LENGTH_SHORT).show();
-                }
-            }
-        });
+
 
         new GpsUtils(getContext()).turnGPSOn(new GpsUtils.onGpsListener() {
             @Override
@@ -353,6 +379,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
+        startTTS();
 //        try {
 //            //sqlHandler = new SqlHandler(getContext());// Sqlite handler
 //            Callback = (FragmentToActivity) context;
@@ -365,29 +392,54 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
     @Override
     public void onDestroyView() {
+        super.onDestroyView();
+        Log.i("onDestroyView", "called");
+        unInitializeAllHandler();
+        if(mMap != null) {
+            mMap.clear();
+        }
 
-        mMarkerIcon = null;
+        if(re_center != null) {
+            re_center.setOnClickListener(null);
+        }
 
-        re_center.setOnClickListener(null);
-        re_center = null;
+        if(popup != null) {
+            popup.setOnMenuItemClickListener(null);
+            popup = null;
+        }
 
-        change_map_options.setOnClickListener(null);
-        change_map_options = null;
+        if(change_map_options != null) {
+            change_map_options.setOnClickListener(null);
+        }
+        if(mapFragment != null) {
+            mapFragment.onDestroyView();
+        }
+        if(sourceMarker != null) {
+            sourceMarker.remove();
+        }
+        if(destinationMarker != null) {
+            destinationMarker.remove();
+        }
 
-        mapFragment.onDestroyView();
-        mapFragment.onDestroy();
-        mapFragment = null;
+    }
 
-        sourceMarker.remove();
-        sourceMarker = null;
-        destinationMarker.remove();
-        destinationMarker = null;
-
-        mMap.clear();
+    void deInitializeView() {
         mMap = null;
         mPositionMarker = null;
+        mMarkerIcon = null;
+        re_center = null;
 
-        super.onDestroyView();
+        if(popup != null) {
+            popup.setOnMenuItemClickListener(null);
+            popup = null;
+        }
+
+        change_map_options = null;
+        mapFragment.onDestroy();
+        mapFragment = null;
+        sourceMarker = null;
+        destinationMarker = null;
+        mCircle = null;
     }
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
@@ -395,7 +447,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
         //Check self permissions for Location and storage
-        if(!checkPermission()){
+        if (!checkPermission()) {
             //Request permissions for Location and storage
             requestPermission();
         }
@@ -404,7 +456,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         //Initialise RootView
         View rootView = inflater.inflate(R.layout.fragment_map, container, false);
         //If writeLogFile==true then writing logs on file otherwise we can't write log files on filestorage ---
-        if(isWriteLogFile) {
+        if (isWriteLogFile) {
             writeLogFile();
         }
 
@@ -497,48 +549,51 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     @SuppressLint("MissingPermission")
     @Override
     public void onClick(View v) {
-        if (v == change_map_options) {
+        if (v.getId() == R.id.change_map_options) {
                 /*
                 Changing Map options on button click To MAP_TYPE_NORMAL,MAP_TYPE_SATELLITE,MAP_TYPE_TERRAIN,MAP_TYPE_HYBRID
                  */
-            PopupMenu popup = new PopupMenu(getContext(), change_map_options);
-            //Inflating the Popup using xml file
-            popup.getMenuInflater()
-                    .inflate(R.menu.popup_menu, popup.getMenu());
-            //registering popup with OnMenuItemClickListener
-            popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
-                public boolean onMenuItemClick(MenuItem item) {
-                    int itemId = item.getItemId();
-                    if (itemId == R.id.slot1) {
-                        if (mMap != null) {
-                            mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
-                            //  Toast.makeText(getContext(), "NORMAL MAP ENABLED", Toast.LENGTH_SHORT).show();
-                        }
-                        return true;
-                    } else if (itemId == R.id.slot2) {
-                        if (mMap != null) {
-                            mMap.setMapType(GoogleMap.MAP_TYPE_SATELLITE);
-                            //  Toast.makeText(getContext(), "SATELLITE MAP ENABLED", Toast.LENGTH_SHORT).show();
-                        }
-                        return true;
-                    } else if (itemId == R.id.slot3) {
-                        if (mMap != null) {
-                            mMap.setMapType(GoogleMap.MAP_TYPE_TERRAIN);
-                            // Toast.makeText(getContext(), "TERRAIN MAP ENABLED", Toast.LENGTH_SHORT).show();
-                        }
-                        return true;
-                    } else if (itemId == R.id.slot4) {
-                        if (mMap != null) {
-                            mMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
-                            //  Toast.makeText(getContext(), "HYBRID MAP ENABLED", Toast.LENGTH_SHORT).show();
+            if(popup == null) {
+                popup = new PopupMenu(getContext(), change_map_options);
+                //Inflating the Popup using xml file
+                popup.getMenuInflater()
+                        .inflate(R.menu.popup_menu, popup.getMenu());
+                //registering popup with OnMenuItemClickListener
+                popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+                    public boolean onMenuItemClick(MenuItem item) {
+                        int itemId = item.getItemId();
+                        if (itemId == R.id.slot1) {
+                            if (mMap != null) {
+                                mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
+                                //  Toast.makeText(getContext(), "NORMAL MAP ENABLED", Toast.LENGTH_SHORT).show();
+                            }
+                            return true;
+                        } else if (itemId == R.id.slot2) {
+                            if (mMap != null) {
+                                mMap.setMapType(GoogleMap.MAP_TYPE_SATELLITE);
+                                //  Toast.makeText(getContext(), "SATELLITE MAP ENABLED", Toast.LENGTH_SHORT).show();
+                            }
+                            return true;
+                        } else if (itemId == R.id.slot3) {
+                            if (mMap != null) {
+                                mMap.setMapType(GoogleMap.MAP_TYPE_TERRAIN);
+                                // Toast.makeText(getContext(), "TERRAIN MAP ENABLED", Toast.LENGTH_SHORT).show();
+                            }
+                            return true;
+                        } else if (itemId == R.id.slot4) {
+                            if (mMap != null) {
+                                mMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
+                                //  Toast.makeText(getContext(), "HYBRID MAP ENABLED", Toast.LENGTH_SHORT).show();
+                            }
+                            return true;
                         }
                         return true;
                     }
-                    return true;
-                }
-            });
+                });
+            }
+
             popup.show();
-        } else if (v == re_center) {
+        } else if (v.getId() == R.id.re_center) {
                 /*
                 Recenter Button if map enabled and location enabled get location from map and update map position and
                 recenter to  the position captured
@@ -603,7 +658,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
                     //To enable Direction text for every 8000ms
                     isLieInGeofence = false;
-                    if( myTimer == null) {
+                    if (myTimer == null) {
                         myTimer = new Timer();
                     }
 
@@ -630,13 +685,20 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                                     } else {
                                                         etaMessage = "ETA: " + estimatedRemainingTime + "sec";
                                                     }
-                                                    Toast toast = Toast.makeText(getActivity().getApplicationContext(), etaMessage, Toast.LENGTH_SHORT);
-                                                    toast.setMargin(70, 50);
-                                                    toast.setGravity(Gravity.BOTTOM, 0, 120);
-                                                    if (isETACrossed) {
-                                                        toast.getView().setBackgroundColor(Color.RED);
+                                                    final Activity tmpActivity = getActivity();
+                                                    if(tmpActivity != null) {
+                                                        final Context context = tmpActivity.getApplicationContext();
+                                                        if(context != null) {
+                                                            Toast toast = Toast.makeText(context, etaMessage, Toast.LENGTH_SHORT);
+                                                            toast.setMargin(70, 50);
+                                                            toast.setGravity(Gravity.BOTTOM, 0, 120);
+                                                            if (isETACrossed) {
+                                                                toast.getView().setBackgroundColor(Color.RED);
+                                                            }
+                                                            toast.show();
+                                                        }
                                                     }
-                                                    toast.show();
+
                                                 }
                                             });
                                         }
@@ -666,274 +728,298 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                     isNavigationStarted = true;
 
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-                        Handler handler = new Handler();
+//                        if(startNavigationHandler == null) {
+//                            startNavigationHandler = new Handler();
+//                        }
+                        final Handler tmpHandler = new Handler(Looper.getMainLooper());
 
                         //Get Location for every 1000 ms
                         int delay = 1000 * 1; //milliseconds
 
-                        handler.postDelayed(new Runnable() {
-                            public void run() {
-                                double returnedDistance_ref = 0.0;
+//                        if (startNavigationRunnable == null) {
+//                            startNavigationRunnable = ;
+//                        }
 
+                        if (isNavigationStarted && !isFragmentDestroyed) {
+                            tmpHandler.postDelayed(new Runnable() {
+                                public void run() {
+                                    double returnedDistance_ref = 0.0;
 
-                                if (currentGpsPosition != null) {
-                                    oldGPSPosition = currentGpsPosition;
-                                    //  Log.v("APP DATA ", "START NAV OLD GPS POSITION ----" + OldGPSPosition);
-                                    // returnedDistance_ref = verifyDeviationCalculateDistance(OldGPSPosition, currentGpsPosition);
-                                    LatLng nearest_LatLng_deviation = findNearestPointOnLine(currentRouteData, currentGpsPosition);
-                                    returnedDistance_ref = SphericalUtil.computeDistanceBetween(currentGpsPosition, nearest_LatLng_deviation);
-                                }
-
-                                consDistList.add(returnedDistance_ref);
-                                isContinue = true;
-
-                                currentGpsPosition = getLastGPSPosition();
-
-                                //Draw circle at current GPS with buffer configured value
-                                //ACTION - CHANGES TO BE DONE
-
-                                if (currentGpsPosition != null) {
-                                    Log.v("APP DATA ", "START NAVI CURRENT GPS POSITION ----" + currentGpsPosition);
-                                    //Draw Circle first time and update position next time
-                                    // drawMarkerWithCircle(currentGpsPosition, routeDeviationDistance);
-                                }
-
-                                // Navigation code starts from here
-
-                                //OldNearestPosition means previous point on road
-                                LatLng OldNearestPosition = null;
-
-                                if (oldGPSPosition != null) {
-
-                                    //Start of the tracking
-                                    if (startTimestamp == 0) {
-                                        // for the first time only
-                                        startTimestamp = System.currentTimeMillis();
+                                    if(mMap == null) {
+                                        return;
                                     }
 
-                                    int timeTakenTillNow = (int) (System.currentTimeMillis() - startTimestamp) / 1000;
-
-                                    // Taking sample of current GPS position, to know from where we have started the journey
-                                    if (timeTakenTillNow < 5) {
-                                        nearlyFirstGPSPosition = cloneCoordinate(currentGpsPosition);
-                                    }
-
-                                    //Get the distance between
-                                    double distance = distFrom(oldGPSPosition.latitude, oldGPSPosition.longitude, currentGpsPosition.latitude, currentGpsPosition.longitude);
-                                    //  Log.e("distance", "distance" + distance);
-
-                                    //if the distance between previous GPS position and current GPS position is more than 40 meters
-                                    //DONT DO ANYTHING - JUST SKIP THE POINT
-                                    //WHY 40 METERS? - ACTION - CHECK
-                                    if (distance > 40) {
-
-                                    } else {
-
-                                        //currentPerpendicularPoint ---- BY DEFAULT NULL
-                                        OldNearestPosition = currentPerpendicularPoint;
-                                        // Log.e("CurrentGpsPoint", " OLD Nearest GpsPoint " + OldNearestPosition);
-
-                                        currentPerpendicularPoint = findNearestPointOnLine(currentRouteData, currentGpsPosition);
-
-                                        Log.e("CurrentGpsPoint", " Nearest GpsPoint" + currentPerpendicularPoint);
-
-                                        //Get the perpendicular distance from GPS to Road
-                                        double distance_movement = distFrom(currentPerpendicularPoint.latitude, currentPerpendicularPoint.longitude, currentGpsPosition.latitude, currentGpsPosition.longitude);
-
-                                        //If the perpendicular distance between current GPS and road is less than 40 meters
-                                        //change the position of marker to point on road
-                                        //ACTION - CHANGE THIS TO BUFFER DISTANCE
-
-
-                                        if (distance_movement < 40) { //Follow current route
-
-                                            Log.e("ORGINAL DATA ", " ORIGINAL DATA----" + currentGpsPosition + "," + currentPerpendicularPoint + "," + distance_movement);
-
-                                            //If there is no marker - create marker
-                                            if (mPositionMarker == null && currentGpsPosition != null) {
-                                                mPositionMarker = mMap.addMarker(new MarkerOptions()
-                                                        .position(SourceNode)
-                                                        .title("Nearest GpsPoint")
-                                                        .anchor(0.5f, 0.5f)
-                                                        .flat(true)
-                                                        .icon(bitmapDescriptorFromVector(getContext(), R.drawable.gps_transperent_98)));
-                                            } else { //update marker position
-                                                // Log.e("CurrentGpsPoint", " currentGpsPosition ------ " + currentGpsPosition);
-
-                                                if (OldNearestPosition != null) {
-                                                    if (!islocationControlEnabled) {
-                                                        Log.e("CurrentGpsPoint", " curren FRM START NAVI ------ " + currentGpsPosition);
-                                                        // Log.e("CurrentGpsPoint", " Old  FRM START NAVI ------ " + OldNearestPosition);
-                                                        Log.e("CurrentGpsPoint", " CGPS " + currentGpsPosition);
-                                                        Log.e("CurrentGpsPoint", " per.CGPS " + currentPerpendicularPoint);
-
-
-                                                        //moving the marker position from old point on road to new point on road in 1000ms
-                                                        animateCarMove(mPositionMarker, OldNearestPosition, currentPerpendicularPoint, 1000);
-                                                        float bearing = (float) bearingBetweenLocations(OldNearestPosition, currentPerpendicularPoint);
-                                                        Log.e("MainRoute", "BEARING @@@@@@@ " + bearing);
-                                                        int height = 0;
-                                                        if (getView() != null) {
-                                                            height = getView().getMeasuredHeight();
-                                                        }
-                                                        Projection p = mMap.getProjection();
-                                                        Point bottomRightPoint = p.toScreenLocation(p.getVisibleRegion().nearRight);
-                                                        Point center = new Point(bottomRightPoint.x / 2, bottomRightPoint.y / 2);
-                                                        Point offset = new Point(center.x, (center.y + (height / 4)));
-                                                        LatLng centerLoc = p.fromScreenLocation(center);
-                                                        Log.e("MainRoute", "centerLoc @@@@@@@ " + centerLoc);
-
-                                                        LatLng offsetNewLoc = p.fromScreenLocation(offset);
-                                                        double offsetDistance = SphericalUtil.computeDistanceBetween(centerLoc, offsetNewLoc);
-                                                        Log.e("MainRoute", "offsetDistance @@@@@@@ " + offsetDistance);
-                                                        LatLng shadowTgt = SphericalUtil.computeOffset(currentPerpendicularPoint, offsetDistance, bearing);
-                                                        Log.e("MainRoute", "shadowTgt @@@@@@@ " + shadowTgt);
-
-                                                        //ETA Calculation
-//                                                      calculateETA(startTimestamp, currentGpsPosition, currentRouteData);
-                                                        if (timeTakenTillNow >= 5) {
-                                                            calculateETA(startTimestamp, currentGpsPosition, currentRouteData);
-                                                        }
-                                                        //*****************************************
-                                                        //If vehicle reaches destination
-                                                        alertDestination(currentGpsPosition);
-                                                        //isReachedDestination(currentPerpendicularPoint, DestinationNode);
-                                                        //*****************************************
-
-                                                        if (offsetDistance > 5 && bearing > 0.0) {
-                                                            CameraPosition currentPlace = new CameraPosition.Builder()
-                                                                    .target(shadowTgt)
-                                                                    .bearing(bearing).tilt(65.5f).zoom(18)
-                                                                    .build();
-                                                            mMap.animateCamera(CameraUpdateFactory.newCameraPosition(currentPlace), 1000, null);
-                                                        }
-                                                    } else {
-                                                        animateCarMoveNotUpdateMarker(mPositionMarker, OldNearestPosition, currentPerpendicularPoint, 1000);
-                                                    }
-
-
-                                                } else {
-                                                    // may be we need add marker animation here
-                                                    //TODO
-                                                }
-                                            }
-
-                                        } else { //if the perpendicular distance is more than 40 (i.e. vehicle deviated the route) (** i.e. vehicle may be deviated the route)
-
-
-                                            Log.e("DEVIATION DATA ", " DEVIATION DATA----" + currentGpsPosition + "," + currentPerpendicularPoint + "," + distance_movement);
-
-                                            // will solve the move back issue, may be
-                                            currentPerpendicularPoint = null;
-
-                                            isContinuoslyOutOfTrack = false;
-
-                                            //Add marker first time
-                                            if (mPositionMarker == null) {
-
-                                                mPositionMarker = mMap.addMarker(new MarkerOptions()
-                                                        .position(currentGpsPosition)
-                                                        .title("Nearest GpsPoint")
-                                                        .anchor(0.5f, 0.5f)
-                                                        .flat(true)
-                                                        .icon(bitmapDescriptorFromVector(getContext(), R.drawable.gps_transperent_98)));
-
-
-                                            } else { //update marker position
-
-                                                //Check three consecutive deviations to hit the API to get new route
-                                                double returnedDistance1 = 0.0;
-                                                double returnedDistance2 = 0.0;
-                                                double returnedDistance3 = 0.0;
-                                                if (consDistList != null && consDistList.size() > 2) {
-                                                    returnedDistance1 = consDistList.get(consDistList.size() - 1);
-                                                    //Log.e("APP DATA ", " Deviation Distance 1 ----" + returnedDistance1);
-                                                    returnedDistance2 = consDistList.get(consDistList.size() - 2);
-                                                    //Log.e("APP DATA ", "Deviation Distance 2 ----" + returnedDistance2);
-                                                    returnedDistance3 = consDistList.get(consDistList.size() - 3);
-                                                    //Log.e("APP DATA ", "Deviation Distance 3 ----" + returnedDistance3);
-                                                }
-
-                                                Log.e("ROUTE DEV MKR UPDATE", " WITHIN ROUTE DEIVATION MARKER UPDATE----" + currentGpsPosition + "," + currentPerpendicularPoint + "," + distance_movement);
-
-                                                //Get the deviated Route
-                                                if (returnedDistance1 > routeDeviationDistance
-                                                        && returnedDistance2 > routeDeviationDistance
-                                                        && returnedDistance3 > routeDeviationDistance) {
-                                                    // Log.e("APP DATA ", "Route Deviated ----" + "YES.....");
-                                                    //  Log.e("APP DATA ", " Deviation Distance 1 ----" + returnedDistance1);
-                                                    //  Log.e("APP DATA ", " Deviation Distance 2 ----" + returnedDistance2);
-                                                    //  Log.e("APP DATA ", " Deviation Distance 3 ----" + returnedDistance3);
-
-                                                    Log.e("BEFR RT DEV HIT", " BEFORE ROUTE DEIVATION API HIT----" + currentGpsPosition + "," + currentPerpendicularPoint + "," + distance_movement);
-
-                                                    // Log.e("APP DATA ", " OLD GPS ----" + OldGPSPosition);
-                                                    Log.e("APP DATA ", " CGPS----" + currentGpsPosition);
-                                                    //  Log.e("APP DATA ", " Per.OLD GPS----" + OldNearestPosition);
-                                                    Log.e("APP DATA ", " Per.CGPS GPS-----" + currentPerpendicularPoint);
-
-                                                    // No animation inside
-                                                    //Hit API to get route and plot
-
-                                                    verifyRouteDeviation(oldGPSPosition, currentGpsPosition, DestinationNode, routeDeviationDistance);
-                                                    Log.e("APP DATA ", " oldGPSPosition ----" + oldGPSPosition);
-                                                    //  Log.e("APP DATA ", " Per.OLD GPS----" + OldNearestPosition);
-                                                    Log.e("APP DATA ", " currentGpsPosition -----" + currentGpsPosition);
-
-                                                }
-
-                                                //map animation
-                                                Log.e("APP DATA ", " ANIMATE CAR MOVE oldGPSPosition-----" + oldGPSPosition);
-
-                                                Log.e("APP DATA ", "  ANIMATE CAR MOVE  currentGPSPosition-----" + currentGpsPosition);
-
-                                                animateCarMove(mPositionMarker, oldGPSPosition, currentGpsPosition, 1000);
-                                                float bearing = (float) bearingBetweenLocations(oldGPSPosition, currentGpsPosition);
-                                                Log.e("Fallow GPS ROUTE", "BEARING : " + bearing);
-                                                int height = 0;
-                                                if (getView() != null) {
-                                                    height = getView().getMeasuredHeight();
-                                                }
-                                                Projection p = mMap.getProjection();
-                                                Point bottomRightPoint = p.toScreenLocation(p.getVisibleRegion().nearRight);
-                                                Point center = new Point(bottomRightPoint.x / 2, bottomRightPoint.y / 2);
-                                                Point offset = new Point(center.x, (center.y + (height / 4)));
-                                                LatLng centerLoc = p.fromScreenLocation(center);
-                                                Log.e("Fallow GPS ROUTE", "centerLoc : " + centerLoc.latitude + "," + centerLoc.longitude);
-                                                LatLng offsetNewLoc = p.fromScreenLocation(offset);
-                                                double offsetDistance = SphericalUtil.computeDistanceBetween(centerLoc, offsetNewLoc);
-                                                Log.e("Fallow GPS ROUTE", "offsetDistance : " + offsetDistance);
-                                                LatLng shadowTgt = SphericalUtil.computeOffset(currentGpsPosition, offsetDistance, bearing);
-                                                Log.e("Fallow GPS ROUTE", "shadowTgt : " + shadowTgt.latitude + "," + shadowTgt.longitude);
-                                                if (offsetDistance > 5 && bearing > 0.0) {
-                                                    CameraPosition currentPlace_main = new CameraPosition.Builder()
-                                                            .target(shadowTgt)
-                                                            .bearing(bearing).tilt(65.5f).zoom(18)
-                                                            .build();
-                                                    mMap.animateCamera(CameraUpdateFactory.newCameraPosition(currentPlace_main), 1000, null);
-                                                }
-                                            }
+                                    if (currentGpsPosition != null) {
+                                        oldGPSPosition = currentGpsPosition;
+                                        //  Log.v("APP DATA ", "START NAV OLD GPS POSITION ----" + OldGPSPosition);
+                                        // returnedDistance_ref = verifyDeviationCalculateDistance(OldGPSPosition, currentGpsPosition);
+                                        LatLng nearest_LatLng_deviation = findNearestPointOnLine(currentRouteData, currentGpsPosition);
+                                        if (nearest_LatLng_deviation != null) {
+                                            returnedDistance_ref = SphericalUtil.computeDistanceBetween(currentGpsPosition, nearest_LatLng_deviation);
                                         }
                                     }
 
-                                }
+                                    consDistList.add(returnedDistance_ref);
+                                    isContinue = true;
+
+                                    currentGpsPosition = getLastGPSPosition();
+
+                                    //Draw circle at current GPS with buffer configured value
+                                    //ACTION - CHANGES TO BE DONE
+
+                                    if (currentGpsPosition != null) {
+                                        Log.v("APP DATA ", "START NAVI CURRENT GPS POSITION ----" + currentGpsPosition);
+                                        //Draw Circle first time and update position next time
+                                        // drawMarkerWithCircle(currentGpsPosition, routeDeviationDistance);
+                                    }
+
+                                    // Navigation code starts from here
+
+                                    //OldNearestPosition means previous point on road
+                                    LatLng OldNearestPosition = null;
+
+                                    if (oldGPSPosition != null) {
+
+                                        //Start of the tracking
+                                        if (startTimestamp == 0) {
+                                            // for the first time only
+                                            startTimestamp = System.currentTimeMillis();
+                                        }
+
+                                        int timeTakenTillNow = (int) (System.currentTimeMillis() - startTimestamp) / 1000;
+
+                                        // Taking sample of current GPS position, to know from where we have started the journey
+                                        if (timeTakenTillNow < 5) {
+                                            nearlyFirstGPSPosition = cloneCoordinate(currentGpsPosition);
+                                        }
+
+                                        //Get the distance between
+                                        double distance = distFrom(oldGPSPosition.latitude, oldGPSPosition.longitude, currentGpsPosition.latitude, currentGpsPosition.longitude);
+                                        //  Log.e("distance", "distance" + distance);
+
+                                        //if the distance between previous GPS position and current GPS position is more than 40 meters
+                                        //DONT DO ANYTHING - JUST SKIP THE POINT
+                                        //WHY 40 METERS? - ACTION - CHECK
+                                        if (distance > 40) {
+
+                                        } else {
+
+                                            //currentPerpendicularPoint ---- BY DEFAULT NULL
+                                            OldNearestPosition = currentPerpendicularPoint;
+                                            // Log.e("CurrentGpsPoint", " OLD Nearest GpsPoint " + OldNearestPosition);
+
+                                            currentPerpendicularPoint = findNearestPointOnLine(currentRouteData, currentGpsPosition);
+
+                                            Log.e("CurrentGpsPoint", " Nearest GpsPoint" + currentPerpendicularPoint);
+
+                                            //Get the perpendicular distance from GPS to Road
+                                            double distance_movement = distFrom(currentPerpendicularPoint.latitude, currentPerpendicularPoint.longitude, currentGpsPosition.latitude, currentGpsPosition.longitude);
+
+                                            //If the perpendicular distance between current GPS and road is less than 40 meters
+                                            //change the position of marker to point on road
+                                            //ACTION - CHANGE THIS TO BUFFER DISTANCE
 
 
-                                // Log.e("RECALL", "Re calling Location trigger method on 19 jan 2021 : " );
+                                            if (distance_movement < 40) { //Follow current route
 
-                                //if the navigation is active then only make a recursive call
-                                if(isNavigationStarted && isFragmentDestroyed == false) {
-                                    handler.postDelayed(this, delay);
-                                } else {
-                                    handler.removeCallbacks(this);
-                                    if( myTimer != null) {
-                                        myTimer.cancel();
-                                        myTimer = null;
+                                                Log.e("ORGINAL DATA ", " ORIGINAL DATA----" + currentGpsPosition + "," + currentPerpendicularPoint + "," + distance_movement);
+
+                                                if(mMap == null) {
+                                                    return;
+                                                }
+                                                //If there is no marker - create marker
+                                                if (mPositionMarker == null && currentGpsPosition != null) {
+                                                    mPositionMarker = mMap.addMarker(new MarkerOptions()
+                                                            .position(SourceNode)
+                                                            .title("Nearest GpsPoint")
+                                                            .anchor(0.5f, 0.5f)
+                                                            .flat(true)
+                                                            .icon(bitmapDescriptorFromVector(getContext(), R.drawable.gps_transperent_98)));
+                                                } else { //update marker position
+                                                    // Log.e("CurrentGpsPoint", " currentGpsPosition ------ " + currentGpsPosition);
+
+                                                    if(mPositionMarker == null || mMap == null) {
+                                                        return;
+                                                    }
+                                                    if (OldNearestPosition != null) {
+                                                        if (!islocationControlEnabled) {
+                                                            Log.e("CurrentGpsPoint", " curren FRM START NAVI ------ " + currentGpsPosition);
+                                                            // Log.e("CurrentGpsPoint", " Old  FRM START NAVI ------ " + OldNearestPosition);
+                                                            Log.e("CurrentGpsPoint", " CGPS " + currentGpsPosition);
+                                                            Log.e("CurrentGpsPoint", " per.CGPS " + currentPerpendicularPoint);
+
+
+                                                            //moving the marker position from old point on road to new point on road in 1000ms
+                                                            animateCarMove(mPositionMarker, OldNearestPosition, currentPerpendicularPoint, 1000);
+                                                            float bearing = (float) bearingBetweenLocations(OldNearestPosition, currentPerpendicularPoint);
+                                                            Log.e("MainRoute", "BEARING @@@@@@@ " + bearing);
+                                                            int height = 0;
+                                                            if (getView() != null) {
+                                                                height = getView().getMeasuredHeight();
+                                                            }
+                                                            Projection p = mMap.getProjection();
+                                                            Point bottomRightPoint = p.toScreenLocation(p.getVisibleRegion().nearRight);
+                                                            Point center = new Point(bottomRightPoint.x / 2, bottomRightPoint.y / 2);
+                                                            Point offset = new Point(center.x, (center.y + (height / 4)));
+                                                            LatLng centerLoc = p.fromScreenLocation(center);
+                                                            Log.e("MainRoute", "centerLoc @@@@@@@ " + centerLoc);
+
+                                                            LatLng offsetNewLoc = p.fromScreenLocation(offset);
+                                                            double offsetDistance = SphericalUtil.computeDistanceBetween(centerLoc, offsetNewLoc);
+                                                            Log.e("MainRoute", "offsetDistance @@@@@@@ " + offsetDistance);
+                                                            LatLng shadowTgt = SphericalUtil.computeOffset(currentPerpendicularPoint, offsetDistance, bearing);
+                                                            Log.e("MainRoute", "shadowTgt @@@@@@@ " + shadowTgt);
+
+                                                            //ETA Calculation
+                                                            //  calculateETA(startTimestamp, currentGpsPosition, currentRouteData);
+                                                            if (timeTakenTillNow >= 5) {
+                                                                calculateETA(startTimestamp, currentGpsPosition, currentRouteData);
+                                                            }
+                                                            //*****************************************
+                                                            //If vehicle reaches destination
+                                                            alertDestination(currentGpsPosition);
+                                                            //isReachedDestination(currentPerpendicularPoint, DestinationNode);
+                                                            //*****************************************
+
+                                                            if (offsetDistance > 5d && bearing > 0f  && mMap != null) {
+                                                                CameraPosition currentPlace = new CameraPosition.Builder()
+                                                                        .target(shadowTgt)
+                                                                        .bearing(bearing).tilt(65.5f).zoom(18)
+                                                                        .build();
+                                                                mMap.animateCamera(CameraUpdateFactory.newCameraPosition(currentPlace), 1000, null);
+                                                            }
+                                                        } else {
+//                                                            animateCarMoveNotUpdateMarker(mPositionMarker, OldNearestPosition, currentPerpendicularPoint, 1000);
+                                                        }
+
+
+                                                    } else {
+                                                        // may be we need add marker animation here
+                                                        //TODO
+                                                    }
+                                                }
+
+                                            } else { //if the perpendicular distance is more than 40 (i.e. vehicle deviated the route) (** i.e. vehicle may be deviated the route)
+
+
+                                                Log.e("DEVIATION DATA ", " DEVIATION DATA----" + currentGpsPosition + "," + currentPerpendicularPoint + "," + distance_movement);
+
+                                                // will solve the move back issue, may be
+                                                currentPerpendicularPoint = null;
+
+                                                isContinuoslyOutOfTrack = false;
+                                                if(mMap == null) {
+                                                    return;
+                                                }
+                                                //Add marker first time
+                                                if (mPositionMarker == null) {
+
+                                                    mPositionMarker = mMap.addMarker(new MarkerOptions()
+                                                            .position(currentGpsPosition)
+                                                            .title("Nearest GpsPoint")
+                                                            .anchor(0.5f, 0.5f)
+                                                            .flat(true)
+                                                            .icon(bitmapDescriptorFromVector(getContext(), R.drawable.gps_transperent_98)));
+
+
+                                                } else { //update marker position
+
+                                                    //Check three consecutive deviations to hit the API to get new route
+                                                    double returnedDistance1 = 0.0;
+                                                    double returnedDistance2 = 0.0;
+                                                    double returnedDistance3 = 0.0;
+                                                    if (consDistList != null && consDistList.size() > 2) {
+                                                        returnedDistance1 = consDistList.get(consDistList.size() - 1);
+                                                        //Log.e("APP DATA ", " Deviation Distance 1 ----" + returnedDistance1);
+                                                        returnedDistance2 = consDistList.get(consDistList.size() - 2);
+                                                        //Log.e("APP DATA ", "Deviation Distance 2 ----" + returnedDistance2);
+                                                        returnedDistance3 = consDistList.get(consDistList.size() - 3);
+                                                        //Log.e("APP DATA ", "Deviation Distance 3 ----" + returnedDistance3);
+                                                    }
+
+                                                    Log.e("ROUTE DEV MKR UPDATE", " WITHIN ROUTE DEIVATION MARKER UPDATE----" + currentGpsPosition + "," + currentPerpendicularPoint + "," + distance_movement);
+
+                                                    //Get the deviated Route
+                                                    if (returnedDistance1 > routeDeviationDistance
+                                                            && returnedDistance2 > routeDeviationDistance
+                                                            && returnedDistance3 > routeDeviationDistance) {
+                                                        // Log.e("APP DATA ", "Route Deviated ----" + "YES.....");
+                                                        //  Log.e("APP DATA ", " Deviation Distance 1 ----" + returnedDistance1);
+                                                        //  Log.e("APP DATA ", " Deviation Distance 2 ----" + returnedDistance2);
+                                                        //  Log.e("APP DATA ", " Deviation Distance 3 ----" + returnedDistance3);
+
+                                                        Log.e("BEFR RT DEV HIT", " BEFORE ROUTE DEIVATION API HIT----" + currentGpsPosition + "," + currentPerpendicularPoint + "," + distance_movement);
+
+                                                        // Log.e("APP DATA ", " OLD GPS ----" + OldGPSPosition);
+                                                        Log.e("APP DATA ", " CGPS----" + currentGpsPosition);
+                                                        //  Log.e("APP DATA ", " Per.OLD GPS----" + OldNearestPosition);
+                                                        Log.e("APP DATA ", " Per.CGPS GPS-----" + currentPerpendicularPoint);
+
+                                                        // No animation inside
+                                                        //Hit API to get route and plot
+
+                                                        verifyRouteDeviation(oldGPSPosition, currentGpsPosition, DestinationNode, routeDeviationDistance);
+                                                        Log.e("APP DATA ", " oldGPSPosition ----" + oldGPSPosition);
+                                                        //  Log.e("APP DATA ", " Per.OLD GPS----" + OldNearestPosition);
+                                                        Log.e("APP DATA ", " currentGpsPosition -----" + currentGpsPosition);
+
+                                                    }
+                                                    if(mPositionMarker == null || mMap == null) {
+                                                        return;
+                                                    }
+                                                    //map animation
+                                                    Log.e("APP DATA ", " ANIMATE CAR MOVE oldGPSPosition-----" + oldGPSPosition);
+
+                                                    Log.e("APP DATA ", "  ANIMATE CAR MOVE  currentGPSPosition-----" + currentGpsPosition);
+
+                                                    animateCarMove(mPositionMarker, oldGPSPosition, currentGpsPosition, 1000);
+                                                    float bearing = (float) bearingBetweenLocations(oldGPSPosition, currentGpsPosition);
+                                                    Log.e("Fallow GPS ROUTE", "BEARING : " + bearing);
+                                                    int height = 0;
+                                                    if (getView() != null) {
+                                                        height = getView().getMeasuredHeight();
+                                                    }
+                                                    Projection p = mMap.getProjection();
+                                                    Point bottomRightPoint = p.toScreenLocation(p.getVisibleRegion().nearRight);
+                                                    Point center = new Point(bottomRightPoint.x / 2, bottomRightPoint.y / 2);
+                                                    Point offset = new Point(center.x, (center.y + (height / 4)));
+                                                    LatLng centerLoc = p.fromScreenLocation(center);
+                                                    Log.e("Fallow GPS ROUTE", "centerLoc : " + centerLoc.latitude + "," + centerLoc.longitude);
+                                                    LatLng offsetNewLoc = p.fromScreenLocation(offset);
+                                                    double offsetDistance = SphericalUtil.computeDistanceBetween(centerLoc, offsetNewLoc);
+                                                    Log.e("Fallow GPS ROUTE", "offsetDistance : " + offsetDistance);
+                                                    LatLng shadowTgt = SphericalUtil.computeOffset(currentGpsPosition, offsetDistance, bearing);
+                                                    Log.e("Fallow GPS ROUTE", "shadowTgt : " + shadowTgt.latitude + "," + shadowTgt.longitude);
+                                                    if (offsetDistance > 5 && bearing > 0.0) {
+                                                        CameraPosition currentPlace_main = new CameraPosition.Builder()
+                                                                .target(shadowTgt)
+                                                                .bearing(bearing).tilt(65.5f).zoom(18)
+                                                                .build();
+                                                        mMap.animateCamera(CameraUpdateFactory.newCameraPosition(currentPlace_main), 1000, null);
+                                                    }
+                                                }
+                                            }
+                                        }
+
+                                    }
+
+
+                                    // Log.e("RECALL", "Re calling Location trigger method on 19 jan 2021 : " );
+
+                                    //if the navigation is active then only make a recursive call
+                                    if (isNavigationStarted && !isFragmentDestroyed) {
+                                        tmpHandler.postDelayed(this, delay);
+                                    } else {
+                                        tmpHandler.removeCallbacksAndMessages(null);
+                                        tmpHandler.removeCallbacks(this);
+                                        if (myTimer != null) {
+                                            myTimer.cancel();
+                                            myTimer = null;
+                                        }
                                     }
                                 }
-                            }
-                        }, delay);
-
+                            }, delay);
+                        }
                         // }
 
                     } //end of Build version check
@@ -952,7 +1038,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
     @SuppressLint("MissingPermission")
     void saveLocation(LatLng location) {
-        if(location != null) {
+        if (location != null) {
             lastGPSPosition = new LatLng(location.latitude, location.longitude);
         }
     }
@@ -963,9 +1049,9 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
               show ALERT TYPE-5  for stoppping map
              */
         try {
-            islocationControlEnabled = true;
+//            islocationControlEnabled = true;
             if (SourceNode != null && DestinationNode != null) {
-                if (mMap != null && isNavigationStarted && islocationControlEnabled) {
+                if (mMap != null && isNavigationStarted) {
                     isNavigationStarted = false;
                     islocationControlEnabled = false;
                     //  Log.e("STOP NAVIGATION", "STOP NAVIGATION INNER VALUE --"+ islocationControlEnabled);
@@ -978,27 +1064,35 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 //                    }
 
                     if (currentGpsPosition != null) {
-                        // String NavigationAlert = " Navigation Stopped " ;
-                        String NavigationAlert = " Navigation Stopped " + currentGpsPosition;
-                        sendData(MapEvents.ALERTVALUE_5, MapEvents.ALERTTYPE_5);
-                        LayoutInflater inflater1 = getActivity().getLayoutInflater();
-                        @SuppressLint("WrongViewCast") final View layout = inflater1.inflate(R.layout.custom_toast, (ViewGroup) getActivity().findViewById(R.id.textView_toast));
-                        final TextView text = (TextView) layout.findViewById(R.id.textView_toast);
-                        final ImageView image = (ImageView) layout.findViewById(R.id.image_toast);
-                        Toast toast = new Toast(getActivity().getApplicationContext());
-                        String stopText = "Navigation Stopped";
-                        text.setText(stopText);
-                        if (stopText.startsWith("Navigation Stopped")) {
-                            image.setImageResource(R.drawable.stop_image);
+                        final Activity tmpActivity = getActivity();
+                        if(tmpActivity != null) {
+                            final Context context = tmpActivity.getApplicationContext();
+                            if(context != null) {
+                                String NavigationAlert = " Navigation Stopped " + currentGpsPosition;
+                                sendData(MapEvents.ALERTVALUE_5, MapEvents.ALERTTYPE_5);
+
+                                LayoutInflater inflater1 = tmpActivity.getLayoutInflater();
+                                @SuppressLint("WrongViewCast") final View layout = inflater1.inflate(R.layout.custom_toast, (ViewGroup) getActivity().findViewById(R.id.textView_toast));
+                                final TextView text = (TextView) layout.findViewById(R.id.textView_toast);
+                                final ImageView image = (ImageView) layout.findViewById(R.id.image_toast);
+                                Toast toast = new Toast(context);
+                                String stopText = "Navigation Stopped";
+                                text.setText(stopText);
+                                if (stopText.startsWith("Navigation Stopped")) {
+                                    image.setImageResource(R.drawable.stop_image);
+                                }
+                                toast.setDuration(Toast.LENGTH_LONG);
+                                toast.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 0);
+                                toast.setGravity(Gravity.TOP, 0, 200);
+                                toast.setView(layout);
+                                toast.show();
+                            }
                         }
-                        toast.setDuration(Toast.LENGTH_LONG);
-                        toast.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 0);
-                        toast.setGravity(Gravity.TOP, 0, 200);
-                        toast.setView(layout);
-                        toast.show();
+                        // String NavigationAlert = " Navigation Stopped " ;
+
                     }
                     // getActivity().onBackPressed();
-                    islocationControlEnabled = false;
+//                    islocationControlEnabled = false;
                     //  Log.e("STOP NAVIGATION", " islocationControlEnabled STOP NAVIGATION FLAG END VALUE "+ islocationControlEnabled);
                 }
             }
@@ -1011,35 +1105,34 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
     private void deinitialize(List<?> v) {
-        if(v != null) {
-            v.clear();
-        }
-        v = null;
+        return;
+//        if(v != null) {
+//            v.clear();
+//        }
+//        v = null;
     }
 
     @Override
     public void onDestroy() {
-        Log.e("onDestroy","NSGIMapFragmentActivity");
+        Log.e("onDestroy", "NSGIMapFragmentActivity");
+
+
+        deInitializeView();
 
         isFragmentDestroyed = true;
-        if (textToSpeech != null) {
-            textToSpeech.stop();
-            textToSpeech.shutdown();
-        }
-        textToSpeech = null;
 
         myReceiver.releaseReference();
         myReceiver = null;
 
         asyncResponse = null;
 
-        lastGPSPosition = null;
+//        lastGPSPosition = null;
 
-        oldGPSPosition = null;
+//        oldGPSPosition = null;
         deinitialize(points);
         deinitialize(convertedPoints);
 
-        mCircle = null;
+
 
         deinitialize(currentRouteData);
         deinitialize(currentDeviatedRouteData);
@@ -1047,14 +1140,14 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
         deinitialize(nearestPointValuesList);
         deinitialize(OldNearestGpsList);
-        SourceNode = null;
-        DestinationNode = null;
-        currentGpsPosition = null;
-        if(myTimer != null) {
+//        SourceNode = null;
+//        DestinationNode = null;
+//        currentGpsPosition = null;
+        if (myTimer != null) {
             myTimer.cancel();
         }
         myTimer = null;
-        currentPerpendicularPoint = null;
+//        currentPerpendicularPoint = null;
 
 
         deinitialize(commonPoints);
@@ -1075,7 +1168,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
         deinitialize(edgeDataList);
 
-        nearlyFirstGPSPosition = null;
+//        nearlyFirstGPSPosition = null;
 
         locationUpdatesService = null;
 
@@ -1083,11 +1176,12 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
 
-
     @Override
     public void onDetach() {
-        super.onDetach();
+
+        stopTTS();
         // Callback = null;
+        super.onDetach();
     }
 
     public void SplitDestinationData(String destinationData) {
@@ -1105,14 +1199,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         }
 
     }
-
-
-
-
-
-
-
-
 
 
     public String displayNavigationMessage(final LatLng currentPosition) {
@@ -1177,12 +1263,19 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                     new Handler(Looper.getMainLooper()).post(new Runnable() {
                         @Override
                         public void run() {
-                            Toast toast = new Toast(getActivity().getApplicationContext());
-                            toast.setDuration(Toast.LENGTH_LONG);
-                            toast.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 0);
-                            toast.setGravity(Gravity.TOP, 0, 130);
-                            toast.setView(layout);
-                            toast.show();
+                            final Activity tmpActivity = getActivity();
+                            if (tmpActivity != null) {
+                                final Context context = tmpActivity.getApplicationContext();
+                                if(context != null) {
+                                    Toast toast = new Toast(context);
+                                    toast.setDuration(Toast.LENGTH_LONG);
+                                    toast.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 0);
+                                    toast.setGravity(Gravity.TOP, 0, 130);
+                                    toast.setView(layout);
+                                    toast.show();
+                                }
+                            }
+
                         }
                     });
                 }
@@ -1279,8 +1372,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
 
-
-
     //@RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
 
 
@@ -1328,7 +1419,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 if (getActivity() != null) {
 
                     routeAPIHit = true;
-                    if(asyncResponse == null) {
+                    if (asyncResponse == null) {
                         asyncResponse = new AsyncResponse() {
                             @Override
                             public void processFinish(Object output) {
@@ -1420,13 +1511,19 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                                         image.setImageResource(R.drawable.deviate_64);
                                                     }
                                                     //set image deviated
+                                                    final Activity tmpActivity = getActivity();
+                                                    if(tmpActivity != null) {
+                                                        final Context context = tmpActivity.getApplicationContext();
+                                                        if(context != null) {
+                                                            Toast toast = new Toast(context);
+                                                            toast.setDuration(Toast.LENGTH_LONG);
+                                                            toast.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 0);
+                                                            toast.setGravity(Gravity.TOP, 0, 150);
+                                                            toast.setView(layout);
+                                                            toast.show();
+                                                        }
+                                                    }
 
-                                                    Toast toast = new Toast(getActivity().getApplicationContext());
-                                                    toast.setDuration(Toast.LENGTH_LONG);
-                                                    toast.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 0);
-                                                    toast.setGravity(Gravity.TOP, 0, 150);
-                                                    toast.setView(layout);
-                                                    toast.show();
                                                     StringBuilder routeDeviatedAlert = new StringBuilder();
                                                     routeDeviatedAlert.append("ROUTE DEVIATED" + " RouteDeviatedSourcePosition : " + routeDeviatedSourcePosition);
                                                     sendData(MapEvents.ALERTVALUE_3, MapEvents.ALERTTYPE_3);
@@ -1452,7 +1549,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                         };
                     }
 
-                    DownloadRouteFromURL download = new DownloadRouteFromURL(asyncResponse, routeDeviatedDT_URL,AuthorisationKey);
+                    DownloadRouteFromURL download = new DownloadRouteFromURL(asyncResponse, routeDeviatedDT_URL, AuthorisationKey);
                     download.execute(routeDiationPosition, destPoint);
                 }
             }
@@ -1502,8 +1599,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         Log.e("COMMON AND UNCOMMON", "SIZES, common:" + commonPoints.size() + "Uncommon" + uncommonPoints.size());
 
     }
-
-
 
 
     private void getRouteDetails(String FeatureResponse) {
@@ -1566,7 +1661,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
 
-
     public static void animateMarker(final LatLng startPosition, final LatLng destination, final Marker marker) {
         if (marker != null) {
             // final LatLng startPosition = marker.getPosition();
@@ -1603,7 +1697,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         mCircle = mMap.addCircle(circleOptions);
 
     }
-
 
 
     public void alertDestination(LatLng currentGpsPosition) {
@@ -1647,13 +1740,11 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
 
-
-
     private void sendData(String comm, int AlertType) {
 
-        FragmentToActivity callback = (FragmentToActivity)getActivity();
+        FragmentToActivity callback = (FragmentToActivity) getActivity();
 
-        if(callback != null) {
+        if (callback != null) {
             //comm=time.toString();
             if (comm != null) {
                 //  Log.e("SendData", "SendData ------- " + comm + "AlertType" + AlertType);
@@ -1662,7 +1753,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
             }
         }
-
 
 
     }
@@ -1931,70 +2021,74 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
     private void animateCarMove(final Marker marker, final LatLng beginLatLng, final LatLng endLatLng, final long duration) {
-        final Handler handler = new Handler();
+
+//        if(animateCarMoveHandler == null) {
+//            animateCarMoveHandler = new Handler();
+//        }
+        final Handler tmpHandler = new Handler(Looper.getMainLooper());
 
         final long startTime = SystemClock.uptimeMillis();
         final Interpolator interpolator = new LinearInterpolator();
         // set car bearing for current part of path
 
-        float angleDeg = (float) (180 * Utils.getAngle(beginLatLng, endLatLng) / Math.PI);
-        Matrix matrix = new Matrix();
-        matrix.postRotate(angleDeg);
+//        float angleDeg = (float) (180 * Utils.getAngle(beginLatLng, endLatLng) / Math.PI);
+//        Matrix matrix = new Matrix();
+//        matrix.postRotate(angleDeg);
         // marker.setIcon(BitmapDescriptorFactory.fromBitmap(Bitmap.createBitmap(mMarkerIcon, 0, 0,mMarkerIcon.getWidth(), mMarkerIcon.getHeight(), matrix, true)));
         //marker.setIcon(BitmapDescriptorFactory.fromBitmap(Bitmap.createBitmap(mMarkerIcon, 0, 0, centerX,centerY, matrix, true)));
-        handler.post(new Runnable() {
+//        if (animateCarMoveRunnable == null) {
+//            animateCarMoveRunnable = ;
+//        }
+
+        tmpHandler.post(new Runnable() {
             @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
             @Override
             public void run() {
 
-                if(isLieInGeofence || isFragmentDestroyed) {
-                    Log.e("Animate marker","Animate marker destination alert in if "+ isLieInGeofence);
-                    handler.removeCallbacks(this);
-                }else {
+                if (isLieInGeofence || isFragmentDestroyed) {
+                    Log.e("Animate marker", "Animate marker destination alert in if " + isLieInGeofence);
+                    tmpHandler.removeCallbacksAndMessages(null);
+                    tmpHandler.removeCallbacks(this);
+                } else if(marker != null && beginLatLng != null && endLatLng != null) {
                     Log.e("Animate marker", "Animate marker destination alert in else" + isLieInGeofence);
-                }
 
-                // calculate phase of animation
-                long elapsed = SystemClock.uptimeMillis() - startTime;
-                float t = interpolator.getInterpolation((float) elapsed / duration);
-                // calculate new position for marker
-                double lat = (endLatLng.latitude - beginLatLng.latitude) * t + beginLatLng.latitude;
-                double lngDelta = endLatLng.longitude - beginLatLng.longitude;
-                if (Math.abs(lngDelta) > 180) {
-                    lngDelta -= Math.signum(lngDelta) * 360;
-                }
-                Location location = new Location(LocationManager.GPS_PROVIDER);
-                location.setLatitude(endLatLng.latitude);
-                location.setLongitude(endLatLng.longitude);
-                float bearingMap = location.getBearing();
-                //  float bearingMap= mMap.getCameraPosition().bearing;
-                float bearing = (float) Utils.bearingBetweenLocations(beginLatLng, endLatLng);
-                float angle = -azimuthInDegress + bearing;
-                float rotation = -azimuthInDegress * 360 / (2 * 3.14159f);
-                double lng = lngDelta * t + beginLatLng.longitude;
-                if (bearing > 0.0) {
+                    // calculate phase of animation
+                    long elapsed = SystemClock.uptimeMillis() - startTime;
+                    float t = interpolator.getInterpolation((float) elapsed / duration);
+                    // calculate new position for marker
+                    double lat = (endLatLng.latitude - beginLatLng.latitude) * t + beginLatLng.latitude;
+                    double lngDelta = endLatLng.longitude - beginLatLng.longitude;
+                    if (Math.abs(lngDelta) > 180) {
+                        lngDelta -= Math.signum(lngDelta) * 360;
+                    }
+                    Location location = new Location(LocationManager.GPS_PROVIDER);
+                    location.setLatitude(endLatLng.latitude);
+                    location.setLongitude(endLatLng.longitude);
+                    float bearingMap = location.getBearing();
+                    //  float bearingMap= mMap.getCameraPosition().bearing;
+                    float bearing = (float) Utils.bearingBetweenLocations(beginLatLng, endLatLng);
+                    float angle = -azimuthInDegress + bearing;
+                    float rotation = -azimuthInDegress * 360 / (2 * 3.14159f);
+                    double lng = lngDelta * t + beginLatLng.longitude;
                     marker.setPosition(new LatLng(lat, lng));
                     marker.setAnchor(0.5f, 0.5f);
                     marker.setFlat(true);
-                    marker.setRotation(bearing);
-                } else {
-                    marker.setPosition(new LatLng(lat, lng));
-                    marker.setAnchor(0.5f, 0.5f);
-                    marker.setFlat(true);
-                }
-                if (t < 1.0) {
-                    handler.postDelayed(this, 16);
-                } else {
-                    float beginAngle = (float) (90 * Utils.getAngle(beginLatLng, endLatLng) / Math.PI);
-                    float endAngle = (float) (90 * Utils.getAngle(currentGpsPosition, endLatLng) / Math.PI);
-                    computeRotation(10, beginAngle, endAngle);
+                    if (bearing > 0.0) {
+                        marker.setRotation(bearing);
+                    }
+                    if (t < 1.0) {
+                        tmpHandler.postDelayed(this, 16);
+                    }
                 }
             }
         });
     }
 
     private void animateCarMoveNotUpdateMarker(final Marker marker, final LatLng beginLatLng, final LatLng endLatLng, final long duration) {
-        final Handler handler = new Handler();
+//        if(animateCarMoveNotUpdateMarkerHandler == null) {
+//            animateCarMoveNotUpdateMarkerHandler = new Handler();
+//        }
+        final Handler tmpHandler = new Handler();
         final long startTime = SystemClock.uptimeMillis();
         final Interpolator interpolator = new LinearInterpolator();
         // set car bearing for current part of path
@@ -2003,36 +2097,37 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         matrix.postRotate(angleDeg);
         // marker.setIcon(BitmapDescriptorFactory.fromBitmap(Bitmap.createBitmap(mMarkerIcon, 0, 0,mMarkerIcon.getWidth(), mMarkerIcon.getHeight(), matrix, true)));
         //marker.setIcon(BitmapDescriptorFactory.fromBitmap(Bitmap.createBitmap(mMarkerIcon, 0, 0, centerX,centerY, matrix, true)));
-        handler.post(new Runnable() {
-            @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
-            @Override
-            public void run() {
+        if (animateCarMoveNotUpdateMarkerRunnable == null) {
+            animateCarMoveNotUpdateMarkerRunnable = new Runnable() {
+                @RequiresApi(api = Build.VERSION_CODES.JELLY_BEAN)
+                @Override
+                public void run() {
 
-                if(isLieInGeofence || isFragmentDestroyed) {
-                    Log.e("Animate marker","Animate marker destination alert in if "+ isLieInGeofence);
-                    handler.removeCallbacks(this);
-                }else {
-                    Log.e("Animate marker", "Animate marker destination alert in else" + isLieInGeofence);
-                }
+                    if (isLieInGeofence || isFragmentDestroyed) {
+                        Log.e("Animate marker", "Animate marker destination alert in if " + isLieInGeofence);
+                        tmpHandler.removeCallbacks(this);
+                    } else {
+                        Log.e("Animate marker", "Animate marker destination alert in else" + isLieInGeofence);
+                    }
 
-                // calculate phase of animation
-                long elapsed = SystemClock.uptimeMillis() - startTime;
-                float t = interpolator.getInterpolation((float) elapsed / duration);
-                // calculate new position for marker
-                double lat = (endLatLng.latitude - beginLatLng.latitude) * t + beginLatLng.latitude;
-                double lngDelta = endLatLng.longitude - beginLatLng.longitude;
-                if (Math.abs(lngDelta) > 180) {
-                    lngDelta -= Math.signum(lngDelta) * 360;
-                }
-                Location location = new Location(LocationManager.GPS_PROVIDER);
-                location.setLatitude(endLatLng.latitude);
-                location.setLongitude(endLatLng.longitude);
-                float bearingMap = location.getBearing();
-                //  float bearingMap= mMap.getCameraPosition().bearing;
-                float bearing = (float) Utils.bearingBetweenLocations(beginLatLng, endLatLng);
-                float angle = -azimuthInDegress + bearing;
-                float rotation = -azimuthInDegress * 360 / (2 * 3.14159f);
-                double lng = lngDelta * t + beginLatLng.longitude;
+                    // calculate phase of animation
+                    long elapsed = SystemClock.uptimeMillis() - startTime;
+                    float t = interpolator.getInterpolation((float) elapsed / duration);
+                    // calculate new position for marker
+                    double lat = (endLatLng.latitude - beginLatLng.latitude) * t + beginLatLng.latitude;
+                    double lngDelta = endLatLng.longitude - beginLatLng.longitude;
+                    if (Math.abs(lngDelta) > 180) {
+                        lngDelta -= Math.signum(lngDelta) * 360;
+                    }
+                    Location location = new Location(LocationManager.GPS_PROVIDER);
+                    location.setLatitude(endLatLng.latitude);
+                    location.setLongitude(endLatLng.longitude);
+                    float bearingMap = location.getBearing();
+                    //  float bearingMap= mMap.getCameraPosition().bearing;
+                    float bearing = (float) Utils.bearingBetweenLocations(beginLatLng, endLatLng);
+                    float angle = -azimuthInDegress + bearing;
+                    float rotation = -azimuthInDegress * 360 / (2 * 3.14159f);
+                    double lng = lngDelta * t + beginLatLng.longitude;
                 /*
                 if(bearing>0.0) {
                     marker.setPosition(new LatLng(lat, lng));
@@ -2045,18 +2140,47 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                     marker.setFlat(true);
                 }
                  */
-                if (t < 1.0) {
-                    handler.postDelayed(this, 16);
-                } else {
-                    float beginAngle = (float) (90 * Utils.getAngle(beginLatLng, endLatLng) / Math.PI);
-                    float endAngle = (float) (90 * Utils.getAngle(currentGpsPosition, endLatLng) / Math.PI);
-                    computeRotation(10, beginAngle, endAngle);
+                    if (t < 1.0) {
+                        tmpHandler.postDelayed(this, 16);
+                    }
+//                    else {
+//                        float beginAngle = (float) (90 * Utils.getAngle(beginLatLng, endLatLng) / Math.PI);
+//                        float endAngle = (float) (90 * Utils.getAngle(currentGpsPosition, endLatLng) / Math.PI);
+//                        computeRotation(10, beginAngle, endAngle);
+//                    }
                 }
-            }
-        });
+            };
+        }
+
+        tmpHandler.post(animateCarMoveNotUpdateMarkerRunnable);
     }
 
+    private void unInitializeAllHandler() {
+        if (startNavigationHandler != null) {
+            if (startNavigationRunnable != null) {
+                startNavigationHandler.removeCallbacks(startNavigationRunnable);
+            }
 
+            startNavigationHandler = null;
+        }
+        startNavigationRunnable = null;
+
+        if (animateCarMoveHandler != null) {
+            if (animateCarMoveRunnable != null) {
+                animateCarMoveHandler.removeCallbacks(animateCarMoveRunnable);
+            }
+            animateCarMoveHandler = null;
+        }
+        animateCarMoveRunnable = null;
+
+        if (animateCarMoveNotUpdateMarkerHandler != null) {
+            if (animateCarMoveNotUpdateMarkerRunnable != null) {
+                animateCarMoveNotUpdateMarkerHandler.removeCallbacks(animateCarMoveNotUpdateMarkerRunnable);
+            }
+            animateCarMoveNotUpdateMarkerHandler = null;
+        }
+        animateCarMoveNotUpdateMarkerRunnable = null;
+    }
 
     public void writeLogFile() {
         if (isExternalStorageWritable()) {

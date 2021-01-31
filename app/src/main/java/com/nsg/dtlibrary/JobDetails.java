@@ -28,15 +28,16 @@ public class JobDetails extends Activity {
     private String charlsisNumber;
     private Button draw_route;
     private Spinner Spinner_Ch_Number;
+    private ArrayAdapter<CharSequence> adapter;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.job_test);
         draw_route=(Button)findViewById(R.id.route_test);
-        Spinner_Ch_Number = (Spinner)findViewById(R.id.Spinner_Ch_Number);
+        Spinner_Ch_Number = (Spinner) findViewById(R.id.Spinner_Ch_Number);
 
-        final ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(JobDetails.this,
+        adapter = ArrayAdapter.createFromResource(JobDetails.this,
                 R.array.Spinner_Ch_Number, android.R.layout.simple_spinner_item);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         Spinner_Ch_Number.setAdapter(adapter);
@@ -161,7 +162,7 @@ public class JobDetails extends Activity {
 
     @Override
     protected void onDestroy() {
-
+        super.onDestroy();
         if(draw_route != null) {
             draw_route.setOnClickListener(null);
             draw_route = null;
@@ -171,6 +172,11 @@ public class JobDetails extends Activity {
             Spinner_Ch_Number.setOnItemSelectedListener(null);
             Spinner_Ch_Number.setAdapter(null);
             Spinner_Ch_Number = null;
+        }
+
+        if(adapter != null) {
+            adapter.clear();
+            adapter = null;
         }
 
         super.onDestroy();
