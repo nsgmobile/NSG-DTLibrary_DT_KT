@@ -171,7 +171,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
     private static int CURRENT_ROUTE_WIDTH = 25;
     private static int DEVIATED_ROUTE_WIDTH = 25;
-    private boolean isMapUpdated=false;
+    public boolean isMapUpdated=false;
     List<RouteMessage> messageContainer = new ArrayList<>();
 
     List<RouteMessage> messageContainerTemp = new ArrayList<>();
