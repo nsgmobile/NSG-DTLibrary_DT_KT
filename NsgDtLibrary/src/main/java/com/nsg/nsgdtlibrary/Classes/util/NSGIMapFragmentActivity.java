@@ -171,7 +171,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
     private static int CURRENT_ROUTE_WIDTH = 25;
     private static int DEVIATED_ROUTE_WIDTH = 25;
-
+    private boolean isMapUpdated=false;
     List<RouteMessage> messageContainer = new ArrayList<>();
 
     List<RouteMessage> messageContainerTemp = new ArrayList<>();
@@ -534,10 +534,19 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                     }
                     //Sending Alert Map is READY
                     isMapLoaded = true;
-                    if (isMapLoaded) {
-                        String MapAlert = "Map is Ready";
-                        sendData(MapEvents.ALERTVALUE_6, MapEvents.ALERTTYPE_6);
-                    }
+                    isMapUpdated=true;
+                    new Handler().postDelayed(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (isMapLoaded && isMapUpdated==true) {
+                                String MapAlert = "Map is Ready";
+                                Log.e("MAP READY CALLBACK","Map is Ready"+MapAlert);
+
+                                sendData(MapEvents.ALERTVALUE_6, MapEvents.ALERTTYPE_6);
+                            }
+                        }
+                    }, 3000);
+
 
 
                 }
