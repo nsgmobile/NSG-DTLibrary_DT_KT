@@ -42,10 +42,12 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
+import androidx.fragment.app.FragmentActivity;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.google.android.gms.maps.CameraUpdateFactory;
@@ -94,7 +96,6 @@ import static com.nsg.nsgdtlibrary.Classes.util.Utils.bitmapDescriptorFromVector
 import static com.nsg.nsgdtlibrary.Classes.util.Utils.calculateDistanceAlongLineFromStart;
 import static com.nsg.nsgdtlibrary.Classes.util.Utils.cloneCoordinate;
 import static com.nsg.nsgdtlibrary.Classes.util.Utils.cloneCoordinates;
-import static com.nsg.nsgdtlibrary.Classes.util.Utils.computeRotation;
 import static com.nsg.nsgdtlibrary.Classes.util.Utils.distFrom;
 import static com.nsg.nsgdtlibrary.Classes.util.Utils.findNearestPointOnLine;
 import static com.nsg.nsgdtlibrary.Classes.util.Utils.getAngle;
@@ -171,7 +172,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
     private static int CURRENT_ROUTE_WIDTH = 25;
     private static int DEVIATED_ROUTE_WIDTH = 25;
-    public boolean isMapUpdated=false;
+
     List<RouteMessage> messageContainer = new ArrayList<>();
 
     List<RouteMessage> messageContainerTemp = new ArrayList<>();
@@ -205,6 +206,8 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
     // Tracks the bound state of the service.
     private boolean mBound = false;
+
+    private FragmentActivity listener;
 
     // Monitors the state of the connection to the service.
     private final ServiceConnection mServiceConnection = new ServiceConnection() {
@@ -284,66 +287,26 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         }
     }
 
-
-    @Override
-    public void onStart() {
-
-        getContext().bindService(new Intent(getContext(), LocationUpdatesService.class), mServiceConnection,
-                Context.BIND_AUTO_CREATE);
-
-        super.onStart();
-    }
-
-    @Override
-    public void onStop() {
-        super.onStop();
-        if (mBound) {
-            // Unbind from the service. This signals to the service that this activity is no longer
-            // in the foreground, and the service can respond by promoting itself to a foreground
-            // service.
-            getContext().unbindService(mServiceConnection);
-            mBound = false;
-        }
-    }
-
-    @Override
-    public void onResume() {
-        super.onResume();
-        LocalBroadcastManager.getInstance(getContext()).registerReceiver(myReceiver,
-                new IntentFilter(LocationUpdatesService.ACTION_BROADCAST));
-//        locationUpdatesService.requestLocationUpdates();
-    }
-
-    @Override
-    public void onPause() {
-        LocalBroadcastManager.getInstance(getContext()).unregisterReceiver(myReceiver);
-//        locationUpdatesService.removeLocationUpdates();
-        super.onPause();
-    }
-
     void startTTS() {
-        final Activity tmpActivity = getActivity();
-        if(tmpActivity != null) {
-            final Context context = tmpActivity.getApplicationContext();
-            if(context != null) {
-                textToSpeech = new TextToSpeech(context, new TextToSpeech.OnInitListener() {
-                    @Override
-                    public void onInit(int status) {
-                        if (status == TextToSpeech.SUCCESS) {
-                            int ttsLang = textToSpeech.setLanguage(Locale.US);
-                            if (ttsLang == TextToSpeech.LANG_MISSING_DATA
-                                    || ttsLang == TextToSpeech.LANG_NOT_SUPPORTED) {
-                                Log.e("TTS", "The Language is not supported!");
-                            } else {
-                                Log.i("TTS", "Language Supported.");
-                            }
-                            Log.i("TTS", "Initialization success.");
+        Context applicationContext = getActivity().getApplicationContext();
+        if(listener != null && applicationContext != null) {
+            textToSpeech = new TextToSpeech(applicationContext, new TextToSpeech.OnInitListener() {
+                @Override
+                public void onInit(int status) {
+                    if (status == TextToSpeech.SUCCESS) {
+                        int ttsLang = textToSpeech.setLanguage(Locale.US);
+                        if (ttsLang == TextToSpeech.LANG_MISSING_DATA
+                                || ttsLang == TextToSpeech.LANG_NOT_SUPPORTED) {
+                            Log.e("TTS", "The Language is not supported!");
                         } else {
-                            Toast.makeText(getContext(), "TTS Initialization failed!", Toast.LENGTH_SHORT).show();
+                            Log.i("TTS", "Language Supported.");
                         }
+                        Log.i("TTS", "Initialization success.");
+                    } else {
+                        Toast.makeText(listener, "TTS Initialization failed!", Toast.LENGTH_SHORT).show();
                     }
-                });
-            }
+                }
+            });
         }
 
     }
@@ -357,44 +320,108 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
     @Override
+    public void onAttach(Context context) {
+        super.onAttach(context);
+        if(context instanceof Activity) {
+            this.listener = (FragmentActivity) context;
+        }
+        myReceiver = new LocationReceiver();
+
+        //starting the location service
+        if(listener != null) {
+            listener.bindService(new Intent(listener, LocationUpdatesService.class), mServiceConnection,
+                    Context.BIND_AUTO_CREATE);
+        }
+        startTTS();
+    }
+
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        myReceiver.setReference(this);
+        if(listener != null) {
+            LocalBroadcastManager.getInstance(listener).registerReceiver(myReceiver,
+                    new IntentFilter(LocationUpdatesService.ACTION_BROADCAST));
+        }
+
+    }
+
+    @Override
+    public void onPause() {
+        if(listener != null) {
+            LocalBroadcastManager.getInstance(listener).unregisterReceiver(myReceiver);
+        }
+        myReceiver.setReference(null);
+        super.onPause();
+    }
+
+    @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setHasOptionsMenu(true);
-
-        myReceiver = new LocationReceiver(this);
-
-        //mLocationManager = (LocationManager) getActivity().getSystemService(LOCATION_SERVICE);
-
-
-        new GpsUtils(getContext()).turnGPSOn(new GpsUtils.onGpsListener() {
-            @Override
-            public void gpsStatus(boolean isGPSEnable) {
-                // turn on GPS
+        if(listener != null) {
+            new GpsUtils(listener).turnGPSOn(new GpsUtils.onGpsListener() {
+                @Override
+                public void gpsStatus(boolean isGPSEnable) {
+                    // turn on GPS
 //                isGPS = isGPSEnable;
-            }
-        });
+                }
+            });
+        }
 
     }
 
-    @Override
-    public void onAttach(Context context) {
-        super.onAttach(context);
-        startTTS();
-//        try {
-//            //sqlHandler = new SqlHandler(getContext());// Sqlite handler
-//            Callback = (FragmentToActivity) context;
-//        } catch (ClassCastException e) {
-//            Log.e("ON ATTACH", e.getMessage(), e);
-//            throw new ClassCastException(context.toString()
-//                    + " must implement FragmentToActivity");
-//        }
-    }
 
     @Override
     public void onDestroyView() {
-        super.onDestroyView();
         Log.i("onDestroyView", "called");
         unInitializeAllHandler();
+        removeListeners();
+        super.onDestroyView();
+    }
+
+    void deInitializeView() {
+        mMap = null;
+        mPositionMarker = null;
+        mMarkerIcon = null;
+        re_center = null;
+
+        if(popup != null) {
+            popup.setOnMenuItemClickListener(null);
+            popup = null;
+        }
+
+        change_map_options = null;
+        mapFragment.onDestroy();
+        mapFragment = null;
+        sourceMarker = null;
+        destinationMarker = null;
+        mCircle = null;
+    }
+
+    private void initListeners() {
+        //Check self permissions for Location and storage
+        if (!checkPermission()) {
+            //Request permissions for Location and storage
+            requestPermission();
+        }
+
+        //If writeLogFile==true then writing logs on file otherwise we can't write log files on filestorage ---
+        if (isWriteLogFile) {
+            writeLogFile();
+        }
+        if(re_center != null) {
+            re_center.setOnClickListener(NSGIMapFragmentActivity.this);
+        }
+
+        if(change_map_options != null) {
+            change_map_options.setOnClickListener(NSGIMapFragmentActivity.this);
+        }
+
+    }
+
+    private void removeListeners() {
         if(mMap != null) {
             mMap.clear();
         }
@@ -420,140 +447,126 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         if(destinationMarker != null) {
             destinationMarker.remove();
         }
-
     }
 
-    void deInitializeView() {
-        mMap = null;
-        mPositionMarker = null;
-        mMarkerIcon = null;
-        re_center = null;
-
-        if(popup != null) {
-            popup.setOnMenuItemClickListener(null);
-            popup = null;
+    private void unInitializeAllHandler() {
+        if (startNavigationHandler != null) {
+            startNavigationHandler.removeCallbacksAndMessages(null);
+            startNavigationHandler = null;
         }
 
-        change_map_options = null;
-        mapFragment.onDestroy();
-        mapFragment = null;
-        sourceMarker = null;
-        destinationMarker = null;
-        mCircle = null;
+        if (animateCarMoveHandler != null) {
+            animateCarMoveHandler.removeCallbacksAndMessages(null);
+            animateCarMoveHandler = null;
+        }
+
+        if (animateCarMoveNotUpdateMarkerHandler != null) {
+            animateCarMoveNotUpdateMarkerHandler.removeCallbacksAndMessages(null);
+            animateCarMoveNotUpdateMarkerHandler = null;
+        }
+    }
+
+    public void writeLogFile() {
+        if (isExternalStorageWritable()) {
+
+            File appDirectory = new File(Environment.getExternalStorageDirectory() + "/RORO_AppLogs");
+            File logDirectory = new File(appDirectory + "/log");
+            File logFile = new File(logDirectory, "RORO_Log" + System.currentTimeMillis() + ".txt");
+
+            // create app folder
+            if (!appDirectory.exists()) {
+                appDirectory.mkdir();
+            }
+
+            // create log folder
+            if (!logDirectory.exists()) {
+                logDirectory.mkdir();
+            }
+
+            // clear the previous logcat and then write the new one to the file
+            try {
+                Process process = Runtime.getRuntime().exec("logcat -c");
+                process = Runtime.getRuntime().exec("logcat -f " + logFile);
+            } catch (IOException e) {
+                Log.e("WRITE LOG FILE", e.getMessage(), e);
+                e.printStackTrace();
+            }
+
+        } else if (isExternalStorageReadable()) {
+            // only readable
+        } else {
+            // not accessible
+        }
+    }
+
+    private void loadMap(GoogleMap googleMap) {
+        if (googleMap != null && listener != null) {
+
+            //Initialise GoogleMap
+            NSGIMapFragmentActivity.this.mMap = googleMap;
+            //mMap.setMapType(GoogleMap.MAP_TYPE_NONE);
+            //set GoogleMap Style
+            NSGIMapFragmentActivity.this.mMap.setMapStyle(MapStyleOptions.loadRawResourceStyle(listener, R.raw.stle_map_json));
+            //set  Tileprovider to GoogleMap
+            if (BASE_MAP_URL_FORMAT != null) {
+                TileProvider tileProvider = new ExpandedMBTilesTileProvider(new File(BASE_MAP_URL_FORMAT.toString()), 256, 256);
+                TileOverlay tileOverlay = mMap.addTileOverlay(new TileOverlayOptions().tileProvider(tileProvider));
+                tileOverlay.setTransparency(0.5f - tileOverlay.getTransparency());
+                tileOverlay.setVisible(true);
+            }
+            if (routeData != null) {
+                /*Get Route From Database and plot on map*/
+                GetRouteFromDBPlotOnMap(routeData);
+                StringBuilder routeAlert = new StringBuilder();
+                routeAlert.append(MapEvents.ALERTVALUE_1).append("SourcePosition : " + SourceNode).append("Destination Node " + DestinationNode);
+                //send alert AlertTupe-1 -- started
+                sendData(routeAlert.toString(), MapEvents.ALERTTYPE_1);
+            }
+
+            //Adding markers on map
+            addMarkers();
+            if (GeoFenceCordinates != null && !GeoFenceCordinates.isEmpty()) {
+                SplitDestinationData(GeoFenceCordinates);
+            }
+            if (ActivityCompat.checkSelfPermission(listener, ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(listener, permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
+                // TODO: Consider calling
+                //    ActivityCompat#requestPermissions
+                return;
+            }
+
+            // sending notification that map is ready
+            if(NSGIMapFragmentActivity.this.mMap != null) {
+                isMapLoaded = true;
+                initListeners();
+                sendData(MapEvents.ALERTVALUE_6, MapEvents.ALERTTYPE_6);
+            }
+        }
+
     }
 
     @RequiresApi(api = Build.VERSION_CODES.KITKAT)
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        //Check self permissions for Location and storage
-        if (!checkPermission()) {
-            //Request permissions for Location and storage
-            requestPermission();
-        }
         //set marker icon
         mMarkerIcon = BitmapFactory.decodeResource(getResources(), R.drawable.gps_transperent_98);
         //Initialise RootView
         View rootView = inflater.inflate(R.layout.fragment_map, container, false);
-        //If writeLogFile==true then writing logs on file otherwise we can't write log files on filestorage ---
-        if (isWriteLogFile) {
-            writeLogFile();
-        }
 
-        //Initialise Buttons
-
-        // dynamic_changeValue = (EditText) rootView.findViewById(R.id.dynamic_buffer);
-        //  submit = (Button) rootView.findViewById(R.id.submit);
-        //  submit.setOnClickListener(NSGIMapFragmentActivity.this);
         re_center = (ImageButton) rootView.findViewById(R.id.re_center);
-        re_center.setOnClickListener(NSGIMapFragmentActivity.this);
         change_map_options = (ImageButton) rootView.findViewById(R.id.change_map_options);
-        change_map_options.setOnClickListener(NSGIMapFragmentActivity.this);
-        // Delete Contents fron ROUTE_T On initialisation of Route view
-        String delQuery = "DELETE  FROM " + RouteT.TABLE_NAME;
-//        sqlHandler.executeQuery(delQuery);
-        /* Insert NewDatata According to  SourceNode,DestinationNode,RouteData To local Database Coloumns*/
-//        if (stNode != null && endNode != null && routeData != null) {
-//            InsertAllRouteData(stNode, endNode, routeData);
-//            getRouteAccordingToRouteID(stNode, endNode);
-//            if (RouteDataList != null && RouteDataList.size() > 0) {
-//                route = RouteDataList.get(0);
-//                String routeDataFrmLocalDB = route.getRouteData();
-//                String sourceText = route.getStartNode();
-//                String[] text = sourceText.split(" ");
-//                sourceLat = Double.parseDouble(text[1]);
-//                sourceLng = Double.parseDouble(text[0]);
-//                String destinationText = route.getEndNode();
-//                String[] text1 = destinationText.split(" ");
-//                destLat = Double.parseDouble(text1[1]);
-//                destLng = Double.parseDouble(text1[0]);
-//            }
-//        }
+
         //Initialise Map fragment
         mapFragment = (SupportMapFragment) getChildFragmentManager().findFragmentById(R.id.frg);  //use SuppoprtMapFragment for using in fragment instead of activity  MapFragment1 = activity   SupportMapFragment = fragment
         mapFragment.getMapAsync(new OnMapReadyCallback() {
             @Override
             public void onMapReady(GoogleMap googlemap) {
-                if (BASE_MAP_URL_FORMAT != null) {
-                    //Initialise GoogleMap
-                    NSGIMapFragmentActivity.this.mMap = googlemap;
-                    //mMap.setMapType(GoogleMap.MAP_TYPE_NONE);
-                    //set GoogleMap Style
-                    NSGIMapFragmentActivity.this.mMap.setMapStyle(MapStyleOptions.loadRawResourceStyle(getContext(), R.raw.stle_map_json));
-                    //set  Tileprovider to GoogleMap
-                    TileProvider tileProvider = new ExpandedMBTilesTileProvider(new File(BASE_MAP_URL_FORMAT.toString()), 256, 256);
-                    TileOverlay tileOverlay = mMap.addTileOverlay(new TileOverlayOptions().tileProvider(tileProvider));
-                    tileOverlay.setTransparency(0.5f - tileOverlay.getTransparency());
-                    tileOverlay.setVisible(true);
-                    if (routeData != null) {
-                        /*Get Route From Database and plot on map*/
-                        GetRouteFromDBPlotOnMap(routeData);
-                        StringBuilder routeAlert = new StringBuilder();
-                        routeAlert.append(MapEvents.ALERTVALUE_1).append("SourcePosition : " + SourceNode).append("Destination Node " + DestinationNode);
-                        //send alert AlertTupe-1 -- started
-                        sendData(routeAlert.toString(), MapEvents.ALERTTYPE_1);
-                    }
-                    //get all edges data from local DB
-//                    getAllEdgesData();
-                    // get Valid Routedata acc to Map
-//                    try {
-//                        getValidRouteData();
-//                    } catch (JSONException e) {
-//                        e.printStackTrace();
-//                        Log.e("getValidRouteData: ", e.getMessage(), e);
-//                    }
-                    //Adding markers on map
-                    addMarkers();
-                    if (GeoFenceCordinates != null && !GeoFenceCordinates.isEmpty()) {
-                        SplitDestinationData(GeoFenceCordinates);
-                    }
-                    if (ActivityCompat.checkSelfPermission(getContext(), ACCESS_FINE_LOCATION) != PackageManager.PERMISSION_GRANTED && ActivityCompat.checkSelfPermission(getContext(), permission.ACCESS_COARSE_LOCATION) != PackageManager.PERMISSION_GRANTED) {
-                        // TODO: Consider calling
-                        //    ActivityCompat#requestPermissions
-                        return;
-                    }
-                    //Sending Alert Map is READY
-                    isMapLoaded = true;
-                    isMapUpdated=true;
-                    new Handler().postDelayed(new Runnable() {
-                        @Override
-                        public void run() {
-                            if (isMapLoaded && isMapUpdated==true) {
-                                String MapAlert = "Map is Ready";
-                                Log.e("MAP READY CALLBACK","Map is Ready"+MapAlert);
-
-                                sendData(MapEvents.ALERTVALUE_6, MapEvents.ALERTTYPE_6);
-                            }
-                        }
-                    }, 3000);
-
-
-
-                }
+                loadMap(googlemap);
             }
         });
         return rootView;
     }
+
 
     @SuppressLint("MissingPermission")
     @Override
@@ -563,45 +576,44 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 Changing Map options on button click To MAP_TYPE_NORMAL,MAP_TYPE_SATELLITE,MAP_TYPE_TERRAIN,MAP_TYPE_HYBRID
                  */
             if(popup == null) {
-                popup = new PopupMenu(getContext(), change_map_options);
-                //Inflating the Popup using xml file
-                popup.getMenuInflater()
-                        .inflate(R.menu.popup_menu, popup.getMenu());
-                //registering popup with OnMenuItemClickListener
-                popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
-                    public boolean onMenuItemClick(MenuItem item) {
-                        int itemId = item.getItemId();
-                        if (itemId == R.id.slot1) {
-                            if (mMap != null) {
-                                mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
-                                //  Toast.makeText(getContext(), "NORMAL MAP ENABLED", Toast.LENGTH_SHORT).show();
-                            }
-                            return true;
-                        } else if (itemId == R.id.slot2) {
-                            if (mMap != null) {
-                                mMap.setMapType(GoogleMap.MAP_TYPE_SATELLITE);
-                                //  Toast.makeText(getContext(), "SATELLITE MAP ENABLED", Toast.LENGTH_SHORT).show();
-                            }
-                            return true;
-                        } else if (itemId == R.id.slot3) {
-                            if (mMap != null) {
-                                mMap.setMapType(GoogleMap.MAP_TYPE_TERRAIN);
-                                // Toast.makeText(getContext(), "TERRAIN MAP ENABLED", Toast.LENGTH_SHORT).show();
-                            }
-                            return true;
-                        } else if (itemId == R.id.slot4) {
-                            if (mMap != null) {
-                                mMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
-                                //  Toast.makeText(getContext(), "HYBRID MAP ENABLED", Toast.LENGTH_SHORT).show();
+                if(listener != null) {
+                    popup = new PopupMenu(listener, change_map_options);
+                    //Inflating the Popup using xml file
+                    popup.getMenuInflater()
+                            .inflate(R.menu.popup_menu, popup.getMenu());
+                    //registering popup with OnMenuItemClickListener
+                    popup.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+                        public boolean onMenuItemClick(MenuItem item) {
+                            int itemId = item.getItemId();
+                            if (itemId == R.id.slot1) {
+                                if (mMap != null) {
+                                    mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
+                                }
+                                return true;
+                            } else if (itemId == R.id.slot2) {
+                                if (mMap != null) {
+                                    mMap.setMapType(GoogleMap.MAP_TYPE_SATELLITE);
+                                }
+                                return true;
+                            } else if (itemId == R.id.slot3) {
+                                if (mMap != null) {
+                                    mMap.setMapType(GoogleMap.MAP_TYPE_TERRAIN);
+                                }
+                                return true;
+                            } else if (itemId == R.id.slot4) {
+                                if (mMap != null) {
+                                    mMap.setMapType(GoogleMap.MAP_TYPE_HYBRID);
+                                }
+                                return true;
                             }
                             return true;
                         }
-                        return true;
-                    }
-                });
-            }
+                    });
+                }
 
-            popup.show();
+            } else {
+                popup.show();
+            }
         } else if (v.getId() == R.id.re_center) {
                 /*
                 Recenter Button if map enabled and location enabled get location from map and update map position and
@@ -620,15 +632,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
             }
         }
 
-//        else if (v.equals(submit)) {
-//            if (!dynamic_changeValue.getText().toString().isEmpty()) {
-//                int val = Integer.parseInt(dynamic_changeValue.getText().toString());
-//                routeDeviationDistance = val;
-//                Log.e("Route Deviation Buffer", " Deviation Buffer Test---- " + routeDeviationDistance);
-//            } else {
-//                routeDeviationDistance = 10;
-//            }
-//        }
     }
 
     //Main method to start the navigation
@@ -642,7 +645,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
              */
 
         islocationControlEnabled = false;
-        Log.v("APP DATA ", "islocationControlEnabled START BUTTON GPS POSITION ----" + oldGPSPosition);
+        Log.d("APP DATA ", "islocationControlEnabled START BUTTON GPS POSITION ----" + oldGPSPosition);
 
 
         if (SourceNode != null && DestinationNode != null) {
@@ -681,36 +684,37 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                     // if (time != null && !time.toString().isEmpty() && estimatedRemainingTime > 0) {
                                     // ETA Calculation
 
-                                    if (estimatedRemainingTime > 0) {
-                                        if (getActivity() != null) {
-                                            new Handler(Looper.getMainLooper()).post(new Runnable() {
-                                                @Override
-                                                public void run() {
-                                                    String etaMessage = "";
-                                                    if (estimatedRemainingTime > 60) {
-                                                        int minute = estimatedRemainingTime / 60;
-                                                        int sec = estimatedRemainingTime % 60;
-                                                        etaMessage = "ETA: " + minute + "min. " + sec + "sec";
-                                                    } else {
-                                                        etaMessage = "ETA: " + estimatedRemainingTime + "sec";
-                                                    }
-                                                    final Activity tmpActivity = getActivity();
-                                                    if(tmpActivity != null) {
-                                                        final Context context = tmpActivity.getApplicationContext();
-                                                        if(context != null) {
-                                                            Toast toast = Toast.makeText(context, etaMessage, Toast.LENGTH_SHORT);
-                                                            toast.setMargin(70, 50);
-                                                            toast.setGravity(Gravity.BOTTOM, 0, 120);
-                                                            if (isETACrossed) {
-                                                                toast.getView().setBackgroundColor(Color.RED);
-                                                            }
-                                                            toast.show();
-                                                        }
-                                                    }
+                                    if(listener == null) {
+                                        myTimer.cancel();
+                                        myTimer = null;
+                                        return;
+                                    }
 
+                                    if (estimatedRemainingTime > 0) {
+                                        new Handler(Looper.getMainLooper()).post(new Runnable() {
+                                            @Override
+                                            public void run() {
+                                                String etaMessage = "";
+                                                if (estimatedRemainingTime > 60) {
+                                                    int minute = estimatedRemainingTime / 60;
+                                                    int sec = estimatedRemainingTime % 60;
+                                                    etaMessage = "ETA: " + minute + "min. " + sec + "sec";
+                                                } else {
+                                                    etaMessage = "ETA: " + estimatedRemainingTime + "sec";
                                                 }
-                                            });
-                                        }
+
+                                                if(listener != null) {
+                                                    Toast toast = Toast.makeText(listener, etaMessage, Toast.LENGTH_SHORT);
+                                                    toast.setMargin(70, 50);
+                                                    toast.setGravity(Gravity.BOTTOM, 0, 120);
+                                                    if (isETACrossed) {
+                                                        toast.getView().setBackgroundColor(Color.RED);
+                                                    }
+                                                    toast.show();
+                                                }
+
+                                            }
+                                        });
                                     }
 
                                 }
@@ -753,6 +757,19 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                             tmpHandler.postDelayed(new Runnable() {
                                 public void run() {
                                     double returnedDistance_ref = 0.0;
+
+                                    if (!isNavigationStarted || isFragmentDestroyed) {
+
+                                        Log.i("stopNavigation", "removed navigation and mytimer 11");
+
+                                        tmpHandler.removeCallbacksAndMessages(null);
+                                        tmpHandler.removeCallbacks(this);
+                                        if (myTimer != null) {
+                                            myTimer.cancel();
+                                            myTimer = null;
+                                        }
+                                        return;
+                                    }
 
                                     if(mMap == null) {
                                         return;
@@ -833,7 +850,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
                                                 Log.e("ORGINAL DATA ", " ORIGINAL DATA----" + currentGpsPosition + "," + currentPerpendicularPoint + "," + distance_movement);
 
-                                                if(mMap == null) {
+                                                if(listener == null || mMap == null) {
                                                     return;
                                                 }
                                                 //If there is no marker - create marker
@@ -843,7 +860,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                                             .title("Nearest GpsPoint")
                                                             .anchor(0.5f, 0.5f)
                                                             .flat(true)
-                                                            .icon(bitmapDescriptorFromVector(getContext(), R.drawable.gps_transperent_98)));
+                                                            .icon(bitmapDescriptorFromVector(listener, R.drawable.gps_transperent_98)));
                                                 } else { //update marker position
                                                     // Log.e("CurrentGpsPoint", " currentGpsPosition ------ " + currentGpsPosition);
 
@@ -917,7 +934,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                                 currentPerpendicularPoint = null;
 
                                                 isContinuoslyOutOfTrack = false;
-                                                if(mMap == null) {
+                                                if(listener == null || mMap == null) {
                                                     return;
                                                 }
                                                 //Add marker first time
@@ -928,7 +945,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                                             .title("Nearest GpsPoint")
                                                             .anchor(0.5f, 0.5f)
                                                             .flat(true)
-                                                            .icon(bitmapDescriptorFromVector(getContext(), R.drawable.gps_transperent_98)));
+                                                            .icon(bitmapDescriptorFromVector(listener, R.drawable.gps_transperent_98)));
 
 
                                                 } else { //update marker position
@@ -1018,7 +1035,11 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                     //if the navigation is active then only make a recursive call
                                     if (isNavigationStarted && !isFragmentDestroyed) {
                                         tmpHandler.postDelayed(this, delay);
+                                        Log.i("startNavigation", "added navigation 10");
                                     } else {
+
+                                        Log.i("stopNavigation", "removed navigation and mytimer 11");
+
                                         tmpHandler.removeCallbacksAndMessages(null);
                                         tmpHandler.removeCallbacks(this);
                                         if (myTimer != null) {
@@ -1063,28 +1084,20 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 if (mMap != null && isNavigationStarted) {
                     isNavigationStarted = false;
                     islocationControlEnabled = false;
-                    //  Log.e("STOP NAVIGATION", "STOP NAVIGATION INNER VALUE --"+ islocationControlEnabled);
 
-
-//                    if (mFusedLocationClient != null) {
-//                        // mFusedLocationClient = null;
-//                        mFusedLocationClient.removeLocationUpdates(locationCallback);
-//                        //  Log.e("STOP NAVIGATION", "STOP NAVIGATION");
-//                    }
-
-                    if (currentGpsPosition != null) {
-                        final Activity tmpActivity = getActivity();
-                        if(tmpActivity != null) {
-                            final Context context = tmpActivity.getApplicationContext();
-                            if(context != null) {
+                    try{
+                        if (currentGpsPosition != null) {
+                            if(listener != null) {
                                 String NavigationAlert = " Navigation Stopped " + currentGpsPosition;
                                 sendData(MapEvents.ALERTVALUE_5, MapEvents.ALERTTYPE_5);
 
-                                LayoutInflater inflater1 = tmpActivity.getLayoutInflater();
-                                @SuppressLint("WrongViewCast") final View layout = inflater1.inflate(R.layout.custom_toast, (ViewGroup) getActivity().findViewById(R.id.textView_toast));
-                                final TextView text = (TextView) layout.findViewById(R.id.textView_toast);
-                                final ImageView image = (ImageView) layout.findViewById(R.id.image_toast);
-                                Toast toast = new Toast(context);
+                                LayoutInflater inflater1 = listener.getLayoutInflater();
+                                View textView = listener.findViewById(R.id.textView_toast);
+
+                                final View layout = inflater1.inflate(R.layout.custom_toast, (ViewGroup) textView);
+                                final TextView text = layout.findViewById(R.id.textView_toast);
+                                final ImageView image = layout.findViewById(R.id.image_toast);
+                                final Toast toast = new Toast(listener);
                                 String stopText = "Navigation Stopped";
                                 text.setText(stopText);
                                 if (stopText.startsWith("Navigation Stopped")) {
@@ -1097,12 +1110,11 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                 toast.show();
                             }
                         }
-                        // String NavigationAlert = " Navigation Stopped " ;
-
+                    } catch (Exception ex) {
+                        Log.e("stopNavigation", ex.getMessage(), ex);
                     }
-                    // getActivity().onBackPressed();
-//                    islocationControlEnabled = false;
-                    //  Log.e("STOP NAVIGATION", " islocationControlEnabled STOP NAVIGATION FLAG END VALUE "+ islocationControlEnabled);
+
+                    // Log.e("STOP NAVIGATION", " islocationControlEnabled STOP NAVIGATION FLAG END VALUE "+ islocationControlEnabled);
                 }
             }
 
@@ -1113,7 +1125,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         }
     }
 
-    private void deinitialize(List<?> v) {
+    private void setNull(List<?> v) {
         return;
 //        if(v != null) {
 //            v.clear();
@@ -1125,49 +1137,53 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     public void onDestroy() {
         Log.e("onDestroy", "NSGIMapFragmentActivity");
 
+        super.onDestroy();
+    }
+
+    private void release() {
+        if (mBound) {
+            // Unbind from the service. This signals to the service that this activity is no longer
+            // in the foreground, and the service can respond by promoting itself to a foreground
+            // service.
+            if(listener != null) {
+                listener.unbindService(mServiceConnection);
+                mBound = false;
+                Log.e("onStop", "service unbind success");
+            }
+        }
 
         deInitializeView();
 
         isFragmentDestroyed = true;
 
-        myReceiver.releaseReference();
         myReceiver = null;
 
         asyncResponse = null;
 
-//        lastGPSPosition = null;
+        setNull(points);
+        setNull(convertedPoints);
 
-//        oldGPSPosition = null;
-        deinitialize(points);
-        deinitialize(convertedPoints);
+        setNull(currentRouteData);
+        setNull(currentDeviatedRouteData);
+        setNull(deviatedRouteData);
 
-
-
-        deinitialize(currentRouteData);
-        deinitialize(currentDeviatedRouteData);
-        deinitialize(deviatedRouteData);
-
-        deinitialize(nearestPointValuesList);
-        deinitialize(OldNearestGpsList);
-//        SourceNode = null;
-//        DestinationNode = null;
-//        currentGpsPosition = null;
+        setNull(nearestPointValuesList);
+        setNull(OldNearestGpsList);
         if (myTimer != null) {
             myTimer.cancel();
         }
         myTimer = null;
-//        currentPerpendicularPoint = null;
 
 
-        deinitialize(commonPoints);
-        deinitialize(uncommonPoints);
+        setNull(commonPoints);
+        setNull(uncommonPoints);
 
-        deinitialize(consDistList);
+        setNull(consDistList);
 
-        deinitialize(destinationGeoFenceCoordinatesList);
-        deinitialize(messageContainer);
+        setNull(destinationGeoFenceCoordinatesList);
+        setNull(messageContainer);
 
-        deinitialize(messageContainerTemp);
+        setNull(messageContainerTemp);
 
         currentPolylineOptions = null;
         currentPolylineGraphics = null;
@@ -1175,21 +1191,18 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         deviatedPolylineOptions = null;
         deviatedPolylineGraphics = null;
 
-        deinitialize(edgeDataList);
-
-//        nearlyFirstGPSPosition = null;
+        setNull(edgeDataList);
 
         locationUpdatesService = null;
 
-        super.onDestroy();
+        listener = null;
     }
-
 
     @Override
     public void onDetach() {
-
         stopTTS();
-        // Callback = null;
+        release();
+
         super.onDetach();
     }
 
@@ -1204,7 +1217,6 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
             double dest_lang = Double.parseDouble(dest_latLngs[1]);
             LatLng destinationLatLng = new LatLng(dest_lat, dest_lang);
             destinationGeoFenceCoordinatesList.add(destinationLatLng);
-
         }
 
     }
@@ -1251,42 +1263,39 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
         if (message != null && !message.isEmpty() && distanceToTravel > 0) {
             String fullMessage = message + " " + distanceToTravel + " meters";
-            if (getActivity() != null) {
+            if (listener != null) {
                 int speechStatus = textToSpeech.speak(fullMessage, TextToSpeech.QUEUE_FLUSH, null);
                 if (speechStatus == TextToSpeech.ERROR) {
                     // Log.e("TTS", "Error in converting Text to Speech!");
                 }
 
-                LayoutInflater inflater1 = getActivity().getLayoutInflater();
-                @SuppressLint("WrongViewCast") final View layout = inflater1.inflate(R.layout.custom_toast, (ViewGroup) getActivity().findViewById(R.id.textView_toast));
-                TextView text = (TextView) layout.findViewById(R.id.textView_toast);
-
-                text.setText(fullMessage);
-                ImageView image = (ImageView) layout.findViewById(R.id.image_toast);
-                if (message.contains("Take Right")) {
-                    image.setImageResource(R.drawable.direction_right);
-                } else if (message.contains("Take Left")) {
-                    image.setImageResource(R.drawable.direction_left);
-                }
-                if (getActivity() != null) {
+                try {
+                    final LayoutInflater inflater1 = listener.getLayoutInflater();
+                    final View textView = listener.findViewById(R.id.textView_toast);
+                    final View layout = inflater1.inflate(R.layout.custom_toast, (ViewGroup) textView);
+                    final TextView text = layout.findViewById(R.id.textView_toast);
+                    final ImageView image = layout.findViewById(R.id.image_toast);
+                    text.setText(fullMessage);
+                    if (message.contains("Take Right")) {
+                        image.setImageResource(R.drawable.direction_right);
+                    } else if (message.contains("Take Left")) {
+                        image.setImageResource(R.drawable.direction_left);
+                    }
                     new Handler(Looper.getMainLooper()).post(new Runnable() {
                         @Override
                         public void run() {
-                            final Activity tmpActivity = getActivity();
-                            if (tmpActivity != null) {
-                                final Context context = tmpActivity.getApplicationContext();
-                                if(context != null) {
-                                    Toast toast = new Toast(context);
-                                    toast.setDuration(Toast.LENGTH_LONG);
-                                    toast.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 0);
-                                    toast.setGravity(Gravity.TOP, 0, 130);
-                                    toast.setView(layout);
-                                    toast.show();
-                                }
+                            if(listener != null) {
+                                final Toast toast = new Toast(listener);
+                                toast.setDuration(Toast.LENGTH_LONG);
+                                toast.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 0);
+                                toast.setGravity(Gravity.TOP, 0, 130);
+                                toast.setView(layout);
+                                toast.show();
                             }
-
                         }
                     });
+                } catch (Exception ex) {
+                    Log.e("displayNavigationMsg", ex.getMessage(), ex);
                 }
             }
         }
@@ -1425,7 +1434,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 // Log.e("returnedDistance", "RouteDiationPosition  ###### " + routeDiationPosition);
                 //   Log.e("returnedDistance", "Destination Position --------- " + destPoint);
                 //  DestinationPosition = new LatLng(destLat, destLng);
-                if (getActivity() != null) {
+                if (listener != null) {
 
                     routeAPIHit = true;
                     if (asyncResponse == null) {
@@ -1506,31 +1515,31 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
                                                 Log.e("ROUTE DEV MKR UPDATE", "DEVIATED ROUTE PLOTTED");
                                                 // isContinuoslyOutOfTrack = true;
-                                                if (getActivity() != null) {
+                                                if (listener != null) {
                                                     Log.e("START OF DEV MSG LOG", "ENTERED INTO DEVIATION MSG LOG");
                                                     Log.e("ROUTE DEV MKR UPDATE", "RAISE TOAST MESSAGE ONLY ONCE");
-                                                    LayoutInflater inflater1 = getActivity().getLayoutInflater();
-                                                    @SuppressLint("WrongViewCast") View layout = inflater1.inflate(R.layout.custom_toast, (ViewGroup) getActivity().findViewById(R.id.textView_toast));
-                                                    TextView text = (TextView) layout.findViewById(R.id.textView_toast);
-                                                    text.setText(" ROUTE DEVIATED ");
-                                                    // set image deviated
-                                                    final ImageView image = (ImageView) layout.findViewById(R.id.image_toast);
-                                                    String deviatedText = " ROUTE DEVIATED ";
-                                                    if (deviatedText.startsWith(" ROUTE DEVIATED ")) {
-                                                        image.setImageResource(R.drawable.deviate_64);
-                                                    }
-                                                    //set image deviated
-                                                    final Activity tmpActivity = getActivity();
-                                                    if(tmpActivity != null) {
-                                                        final Context context = tmpActivity.getApplicationContext();
-                                                        if(context != null) {
-                                                            Toast toast = new Toast(context);
-                                                            toast.setDuration(Toast.LENGTH_LONG);
-                                                            toast.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 0);
-                                                            toast.setGravity(Gravity.TOP, 0, 150);
-                                                            toast.setView(layout);
-                                                            toast.show();
+                                                    try {
+                                                        final LayoutInflater inflater1 = listener.getLayoutInflater();
+                                                        final View textView = listener.findViewById(R.id.textView_toast);
+                                                        final View layout = inflater1.inflate(R.layout.custom_toast, (ViewGroup) textView);
+                                                        final TextView text = (TextView) layout.findViewById(R.id.textView_toast);
+                                                        text.setText(" ROUTE DEVIATED ");
+                                                        // set image deviated
+                                                        final ImageView image = (ImageView) layout.findViewById(R.id.image_toast);
+                                                        String deviatedText = " ROUTE DEVIATED ";
+                                                        if (deviatedText.startsWith(" ROUTE DEVIATED ")) {
+                                                            image.setImageResource(R.drawable.deviate_64);
                                                         }
+                                                        //set image deviated
+
+                                                        final Toast toast = new Toast(listener);
+                                                        toast.setDuration(Toast.LENGTH_LONG);
+                                                        toast.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL, 0, 0);
+                                                        toast.setGravity(Gravity.TOP, 0, 150);
+                                                        toast.setView(layout);
+                                                        toast.show();
+                                                    } catch (Exception ex) {
+                                                        Log.e("processFinish", ex.getMessage(), ex);
                                                     }
 
                                                     StringBuilder routeDeviatedAlert = new StringBuilder();
@@ -1719,28 +1728,28 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
             Log.e("Destination Geofence", "Destination Geofence Cordinates : " + destinationGeoFenceCoordinatesList);
 
             Log.e("Destination Geofence", "Destination Geofence : " + isLieInGeofence);
-            if (getActivity() != null) {
+            if (listener != null) {
                 if (isAlertShown == false) {
 
-                    if (isLieInGeofence == true) {
-
-                        String data1 = " Your Destination Reached ";
-                        int speechStatus1 = textToSpeech.speak(data1, TextToSpeech.QUEUE_FLUSH, null);
-                        if (speechStatus1 == TextToSpeech.ERROR) {
-                            Log.e("TTS", "Error in converting Text to Speech!");
-                        }
-                        sendData(MapEvents.ALERTVALUE_4, MapEvents.ALERTTYPE_4);
-
-                        Log.e("AlertDestination", "Alert Destination" + "DESTINATION REACHED--");
-                        isAlertShown = true;
-                        //added by SKC
-                        isNavigationStarted = false;
-
-                        //need to clear resources
-
-                    } else {
-                        //Log.e("AlertDestination", "Alert Destination" + "DESTINATION NOT REACHED--");
-                    }
+//                    if (isLieInGeofence == true) {
+//
+//                        String data1 = " Your Destination Reached ";
+//                        int speechStatus1 = textToSpeech.speak(data1, TextToSpeech.QUEUE_FLUSH, null);
+//                        if (speechStatus1 == TextToSpeech.ERROR) {
+//                            Log.e("TTS", "Error in converting Text to Speech!");
+//                        }
+//                        sendData(MapEvents.ALERTVALUE_4, MapEvents.ALERTTYPE_4);
+//
+//                        Log.e("AlertDestination", "Alert Destination" + "DESTINATION REACHED--");
+//                        isAlertShown = true;
+//                        //added by SKC
+//                        isNavigationStarted = false;
+//
+//                        //need to clear resources
+//
+//                    } else {
+//                        //Log.e("AlertDestination", "Alert Destination" + "DESTINATION NOT REACHED--");
+//                    }
                 } else {
 
                 }
@@ -1751,16 +1760,20 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
     private void sendData(String comm, int AlertType) {
 
-        FragmentToActivity callback = (FragmentToActivity) getActivity();
+        if(listener == null) {
+            Log.e("sendData", "can not communicate as listener is null");
+            return;
+        }
+        FragmentToActivity callback = (FragmentToActivity) listener;
 
         if (callback != null) {
             //comm=time.toString();
             if (comm != null) {
                 //  Log.e("SendData", "SendData ------- " + comm + "AlertType" + AlertType);
                 callback.communicate(comm, AlertType);
-            } else {
-
             }
+        } else {
+            Log.e("sendData", "can not communicate as callback is null");
         }
 
 
@@ -1768,10 +1781,13 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
 
     public void addMarkers() {
+        if(listener == null) {
+            return;
+        }
         if (SourceNode != null && DestinationNode != null) {
             sourceMarker = mMap.addMarker(new MarkerOptions()
                     .position(SourceNode)
-                    .icon(bitmapDescriptorFromVector(getActivity(), R.drawable.source_marker_whitetext)));
+                    .icon(bitmapDescriptorFromVector(listener, R.drawable.source_marker_whitetext)));
             CameraPosition googlePlex = CameraPosition.builder()
                     .target(SourceNode)
                     .zoom(18)
@@ -1781,7 +1797,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
             destinationMarker = mMap.addMarker(new MarkerOptions()
                     .position(DestinationNode)
-                    .icon(bitmapDescriptorFromVector(getActivity(), R.drawable.destination_marker_whitetext_lightgreen)));
+                    .icon(bitmapDescriptorFromVector(listener, R.drawable.destination_marker_whitetext_lightgreen)));
             Log.e("Source Marker ", "SourceNode Marker : " + SourceNode);
             Log.e("Destination Marker", "DestinationNode Marker : " + DestinationNode);
 
@@ -1798,7 +1814,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         } else {
             mMap.addMarker(new MarkerOptions()
                     .position(new LatLng(24.984408, 55.072814))
-                    .icon(bitmapDescriptorFromVector(getActivity(), R.drawable.blue_marker)));
+                    .icon(bitmapDescriptorFromVector(listener, R.drawable.blue_marker)));
             CameraPosition googlePlex = CameraPosition.builder()
                     .target(new LatLng(24.984408, 55.072814))
                     .zoom(15)
@@ -1934,20 +1950,26 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     }
 
     private boolean checkPermission() {
-        return PackageManager.PERMISSION_GRANTED == ContextCompat.checkSelfPermission(getContext(), ACCESS_FINE_LOCATION) &&
-                PackageManager.PERMISSION_GRANTED == ContextCompat.checkSelfPermission(getContext(), READ_EXTERNAL_STORAGE);
+        if(listener == null) {
+            return false;
+        }
+        return PackageManager.PERMISSION_GRANTED == ContextCompat.checkSelfPermission(listener, ACCESS_FINE_LOCATION) &&
+                PackageManager.PERMISSION_GRANTED == ContextCompat.checkSelfPermission(listener, READ_EXTERNAL_STORAGE);
     }
 
     private void requestPermission() {
-
-        ActivityCompat.requestPermissions(getActivity(), new String[]{ACCESS_FINE_LOCATION, READ_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
-
+        if(listener != null) {
+            ActivityCompat.requestPermissions(listener, new String[]{ACCESS_FINE_LOCATION, READ_EXTERNAL_STORAGE}, PERMISSION_REQUEST_CODE);
+        }
     }
 
 
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if(listener == null) {
+            return;
+        }
         switch (requestCode) {
             case PERMISSION_REQUEST_CODE: {
                 if (grantResults.length > 0) {
@@ -1956,13 +1978,13 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                     boolean storageAccepted = grantResults[1] == PackageManager.PERMISSION_GRANTED;
 
                     if (locationAccepted && storageAccepted) {
-                        Toast.makeText(getContext(), "Permission Granted,.", Toast.LENGTH_LONG).show();
+                        Toast.makeText(listener, "Permission Granted,.", Toast.LENGTH_LONG).show();
                     } else {
                         // Toast.makeText(this, "Permission Denied, You cannot access location data and camera.", Snackbar.LENGTH_LONG).show();
 
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                             if (shouldShowRequestPermissionRationale(ACCESS_FINE_LOCATION)) {
-                                AlertDialog.Builder builder = new AlertDialog.Builder(getContext());
+                                AlertDialog.Builder builder = new AlertDialog.Builder(listener);
                                 builder.setMessage("Look at this dialog!")
                                         .setCancelable(false)
                                         .setPositiveButton("OK", new DialogInterface.OnClickListener() {
@@ -2011,7 +2033,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                         });
                     }*/
                 } else {
-                    Toast.makeText(getContext(), "Permission denied", Toast.LENGTH_SHORT).show();
+                    Toast.makeText(listener, "Permission denied", Toast.LENGTH_SHORT).show();
                 }
                 break;
             }
@@ -2114,6 +2136,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
                     if (isLieInGeofence || isFragmentDestroyed) {
                         Log.e("Animate marker", "Animate marker destination alert in if " + isLieInGeofence);
+                        tmpHandler.removeCallbacksAndMessages(null);
                         tmpHandler.removeCallbacks(this);
                     } else {
                         Log.e("Animate marker", "Animate marker destination alert in else" + isLieInGeofence);
@@ -2164,65 +2187,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         tmpHandler.post(animateCarMoveNotUpdateMarkerRunnable);
     }
 
-    private void unInitializeAllHandler() {
-        if (startNavigationHandler != null) {
-            if (startNavigationRunnable != null) {
-                startNavigationHandler.removeCallbacks(startNavigationRunnable);
-            }
 
-            startNavigationHandler = null;
-        }
-        startNavigationRunnable = null;
-
-        if (animateCarMoveHandler != null) {
-            if (animateCarMoveRunnable != null) {
-                animateCarMoveHandler.removeCallbacks(animateCarMoveRunnable);
-            }
-            animateCarMoveHandler = null;
-        }
-        animateCarMoveRunnable = null;
-
-        if (animateCarMoveNotUpdateMarkerHandler != null) {
-            if (animateCarMoveNotUpdateMarkerRunnable != null) {
-                animateCarMoveNotUpdateMarkerHandler.removeCallbacks(animateCarMoveNotUpdateMarkerRunnable);
-            }
-            animateCarMoveNotUpdateMarkerHandler = null;
-        }
-        animateCarMoveNotUpdateMarkerRunnable = null;
-    }
-
-    public void writeLogFile() {
-        if (isExternalStorageWritable()) {
-
-            File appDirectory = new File(Environment.getExternalStorageDirectory() + "/RORO_AppLogs");
-            File logDirectory = new File(appDirectory + "/log");
-            File logFile = new File(logDirectory, "RORO_Log" + System.currentTimeMillis() + ".txt");
-
-            // create app folder
-            if (!appDirectory.exists()) {
-                appDirectory.mkdir();
-            }
-
-            // create log folder
-            if (!logDirectory.exists()) {
-                logDirectory.mkdir();
-            }
-
-            // clear the previous logcat and then write the new one to the file
-            try {
-                Process process = Runtime.getRuntime().exec("logcat -c");
-                process = Runtime.getRuntime().exec("logcat -f " + logFile);
-            } catch (IOException e) {
-                Log.e("WRITE LOG FILE", e.getMessage(), e);
-                e.printStackTrace();
-            }
-
-        } else if (isExternalStorageReadable()) {
-            // only readable
-        } else {
-            // not accessible
-        }
-    }
 
 
     /* Checks if external storage is available for read and write */
