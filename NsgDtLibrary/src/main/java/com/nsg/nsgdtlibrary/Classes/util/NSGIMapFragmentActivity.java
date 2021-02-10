@@ -61,6 +61,7 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MapStyleOptions;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.PolygonOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.maps.model.TileOverlay;
@@ -1722,9 +1723,9 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     public void checkForDestination(LatLng currentGpsPosition) {
 
         if (destinationGeoFenceCoordinatesList != null && destinationGeoFenceCoordinatesList.size() > 2) {
-            //PolygonOptions polygonOptions = new PolygonOptions().addAll(destinationGeoFenceCoordinatesList);
-            //mMap.addPolygon(polygonOptions);
-            //polygonOptions.fillColor(Color.CYAN);
+            PolygonOptions polygonOptions = new PolygonOptions().addAll(destinationGeoFenceCoordinatesList);
+            mMap.addPolygon(polygonOptions);
+            polygonOptions.fillColor(Color.CYAN);
             isLieInGeofence = false;
             isLieInGeofence = pointWithinPolygon(currentGpsPosition, destinationGeoFenceCoordinatesList);
             Log.i("Destination Geofence", "Destination Geofence Cordinates : " + destinationGeoFenceCoordinatesList);
