@@ -61,7 +61,6 @@ import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.MapStyleOptions;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
-import com.google.android.gms.maps.model.PolygonOptions;
 import com.google.android.gms.maps.model.Polyline;
 import com.google.android.gms.maps.model.PolylineOptions;
 import com.google.android.gms.maps.model.TileOverlay;
@@ -488,7 +487,8 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
             try {
                 Process process = Runtime.getRuntime().exec("logcat -c");
                 process = Runtime.getRuntime().exec("logcat -f " + logFile);
-                Runtime.getRuntime().exec("logcat *:E *:S -f " + logErrFile);
+                Runtime.getRuntime().exec("logcat *e " + logErrFile);
+               // Runtime.getRuntime().exec("logcat *:E *:S -f " + logErrFile);
             } catch (IOException e) {
                 Log.e("WRITE LOG FILE", e.getMessage(), e);
                 e.printStackTrace();
@@ -649,6 +649,10 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         islocationControlEnabled = false;
         Log.d("APP DATA ", "islocationControlEnabled START BUTTON GPS POSITION ----" + oldGPSPosition);
 
+        Log.i("NAVIGATION STARTED ", " NAVIGATION STARTED IN INFO MODE " + "INFO MODE");
+
+        Log.e("NAVIGATION STARTED ", " NAVIGATION STARTED IN EXCEPTION MODE " + "EXCEPTION MODE");
+
 
         if (SourceNode != null && DestinationNode != null) {
 
@@ -704,7 +708,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                                 } else {
                                                     etaMessage = "ETA: " + estimatedRemainingTime + "sec";
                                                 }
-
+                                                /*   //Need To Enable Later ##################1
                                                 if(listener != null) {
                                                     Toast toast = Toast.makeText(listener, etaMessage, Toast.LENGTH_SHORT);
                                                     toast.setMargin(70, 50);
@@ -714,6 +718,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                                     }
                                                     toast.show();
                                                 }
+                                                */
 
                                             }
                                         });
@@ -1090,6 +1095,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
                     try{
                         if (currentGpsPosition != null) {
+                            /*Need to enable it again after testing ################ 2
                             if(listener != null) {
                                 String NavigationAlert = " Navigation Stopped " + currentGpsPosition;
                                 sendData(MapEvents.ALERTVALUE_5, MapEvents.ALERTTYPE_5);
@@ -1111,7 +1117,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                 toast.setGravity(Gravity.TOP, 0, 200);
                                 toast.setView(layout);
                                 toast.show();
-                            }
+                            }*/
                         }
                     } catch (Exception ex) {
                         Log.e("stopNavigation", ex.getMessage(), ex);
@@ -1271,7 +1277,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 if (speechStatus == TextToSpeech.ERROR) {
                     // Log.e("TTS", "Error in converting Text to Speech!");
                 }
-
+                /*  Need to Enable it again after testing #########################3
                 try {
                     final LayoutInflater inflater1 = listener.getLayoutInflater();
                     final View textView = listener.findViewById(R.id.textView_toast);
@@ -1300,6 +1306,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 } catch (Exception ex) {
                     Log.e("displayNavigationMsg", ex.getMessage(), ex);
                 }
+                */
             }
         }
 
@@ -1518,9 +1525,12 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
                                                 Log.i("ROUTE DEV MKR UPDATE", "DEVIATED ROUTE PLOTTED");
                                                 // isContinuoslyOutOfTrack = true;
+
+
                                                 if (listener != null) {
                                                     Log.i("START OF DEV MSG LOG", "ENTERED INTO DEVIATION MSG LOG");
                                                     Log.i("ROUTE DEV MKR UPDATE", "RAISE TOAST MESSAGE ONLY ONCE");
+                                                    /*  //Need To Enable Later after testing ###################4
                                                     try {
                                                         final LayoutInflater inflater1 = listener.getLayoutInflater();
                                                         final View textView = listener.findViewById(R.id.textView_toast);
@@ -1544,6 +1554,9 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                                     } catch (Exception ex) {
                                                         Log.e("processFinish", ex.getMessage(), ex);
                                                     }
+
+                                                     */
+
 
                                                     StringBuilder routeDeviatedAlert = new StringBuilder();
                                                     routeDeviatedAlert.append("ROUTE DEVIATED" + " RouteDeviatedSourcePosition : " + routeDeviatedSourcePosition);
@@ -1723,9 +1736,9 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     public void checkForDestination(LatLng currentGpsPosition) {
 
         if (destinationGeoFenceCoordinatesList != null && destinationGeoFenceCoordinatesList.size() > 2) {
-            PolygonOptions polygonOptions = new PolygonOptions().addAll(destinationGeoFenceCoordinatesList);
-            mMap.addPolygon(polygonOptions);
-            polygonOptions.fillColor(Color.CYAN);
+            //PolygonOptions polygonOptions = new PolygonOptions().addAll(destinationGeoFenceCoordinatesList);
+            //mMap.addPolygon(polygonOptions);
+            //polygonOptions.fillColor(Color.CYAN);
             isLieInGeofence = false;
             isLieInGeofence = pointWithinPolygon(currentGpsPosition, destinationGeoFenceCoordinatesList);
             Log.i("Destination Geofence", "Destination Geofence Cordinates : " + destinationGeoFenceCoordinatesList);
