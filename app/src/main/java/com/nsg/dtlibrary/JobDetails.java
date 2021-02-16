@@ -45,7 +45,7 @@ public class JobDetails extends Activity {
             @Override
             public void onItemSelected(AdapterView<?> parentView, View selectedItemView, int position, long id) {
                 charlsisNumber = (String) parentView.getItemAtPosition(position);
-                Log.e("SpinnerDT :", " Selected Item From SpinnerDT " + charlsisNumber);
+               // Log.e("SpinnerDT :", " Selected Item From SpinnerDT " + charlsisNumber);
             }
 
             @Override
