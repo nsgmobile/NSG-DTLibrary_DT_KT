@@ -24,7 +24,7 @@ public class LocationReceiver extends BroadcastReceiver {
     public void onReceive(Context context, Intent intent) {
         Location location = intent.getParcelableExtra(LocationUpdatesService.EXTRA_LOCATION);
         if (location != null) {
-            Log.e("myreceiver", Utils.getLocationText(location));
+           // Log.e("myreceiver", Utils.getLocationText(location));
             fragmentActivity.saveLocation(new LatLng(location.getLatitude(), location.getLongitude()));
         }
     }
