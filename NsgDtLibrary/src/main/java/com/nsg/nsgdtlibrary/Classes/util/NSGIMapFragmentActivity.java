@@ -113,7 +113,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
     boolean locationAccepted, islocationControlEnabled = false;
     // private static final int SENSOR_DELAY_NORMAL =50;
     private TextToSpeech textToSpeech = null;
-
+    private  boolean isExceptionLogEnable=false;
     // do not use this directly
     LatLng lastGPSPosition = null;
 
@@ -259,12 +259,12 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         return new NSGIMapFragmentActivity(BASE_MAP_URL_FORMAT);
     }
 
-    public static NSGIMapFragmentActivity getInstance(String BASE_MAP_URL_FORMAT, String stNode, String endNode, String routeData, int routeDeviationBuffer, String routeDeviatedDT_URL, String AuthorisationKey, String geoFenceCoordinates, boolean isWriteLogFile) {
-        return new NSGIMapFragmentActivity(BASE_MAP_URL_FORMAT, stNode, endNode, routeData, routeDeviationBuffer, routeDeviatedDT_URL, AuthorisationKey, geoFenceCoordinates, isWriteLogFile);
+    public static NSGIMapFragmentActivity getInstance(String BASE_MAP_URL_FORMAT, String stNode, String endNode, String routeData, int routeDeviationBuffer, String routeDeviatedDT_URL, String AuthorisationKey, String geoFenceCoordinates, boolean isWriteLogFile,boolean isExceptionLogEnable) {
+        return new NSGIMapFragmentActivity(BASE_MAP_URL_FORMAT, stNode, endNode, routeData, routeDeviationBuffer, routeDeviatedDT_URL, AuthorisationKey, geoFenceCoordinates, isWriteLogFile ,isExceptionLogEnable);
     }
 
     @SuppressLint("ValidFragment")
-    public NSGIMapFragmentActivity(String BASE_MAP_URL_FORMAT, String stNode, String endNode, String routeData, int routeDeviationBuffer, String routeDeviatedDT_URL, String AuthorisationKey, String GeoFenceCordinates, boolean isWriteLogFile) {
+    public NSGIMapFragmentActivity(String BASE_MAP_URL_FORMAT, String stNode, String endNode, String routeData, int routeDeviationBuffer, String routeDeviatedDT_URL, String AuthorisationKey, String GeoFenceCordinates, boolean isWriteLogFile,boolean isExceptionLogEnable) {
         this.BASE_MAP_URL_FORMAT = BASE_MAP_URL_FORMAT;
         this.stNode = stNode;
         this.endNode = endNode;
@@ -274,6 +274,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         this.AuthorisationKey = AuthorisationKey;
         this.GeoFenceCordinates = GeoFenceCordinates;
         this.isWriteLogFile = isWriteLogFile;
+        this.isExceptionLogEnable= isExceptionLogEnable;
     }
 
     private LatLng getLastGPSPosition() {
@@ -406,7 +407,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         }
 
         //If writeLogFile==true then writing logs on file otherwise we can't write log files on filestorage ---
-        if (isWriteLogFile) {
+        if (isWriteLogFile || isExceptionLogEnable==true) {
             writeLogFile();
         }
         if(re_center != null) {
@@ -463,8 +464,61 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
             animateCarMoveNotUpdateMarkerHandler = null;
         }
     }
-
     public void writeLogFile() {
+        if (isExternalStorageWritable()) {
+
+            File appDirectory = new File(Environment.getExternalStorageDirectory() + "/RORO_AppLogs");
+            File logDirectory = new File(appDirectory + "/log");
+            long lng = System.currentTimeMillis();
+
+            // create app folder
+            if (!appDirectory.exists()) {
+                appDirectory.mkdir();
+            }
+
+            // create log folder
+            if (!logDirectory.exists()) {
+                logDirectory.mkdir();
+            }
+
+            // clear the previous logcat and then write the new one to the file
+            try {
+                File logFile = new File(logDirectory, "RORO_Log" + lng + ".txt");
+                Process process = Runtime.getRuntime().exec("logcat -c");
+                if(isWriteLogFile==true) {
+                    process = Runtime.getRuntime().exec("logcat -f " + logFile);
+                }
+                if(isExceptionLogEnable==true){
+                    File logErrFile  = new File(logDirectory, "RORO_Log_err" + ".txt");
+                    if(logErrFile.exists()) {
+                        boolean isFileDeleted = logErrFile.delete();
+                        if(isFileDeleted==true) {
+                            logErrFile  = new File(logDirectory, "RORO_Log_err" + ".txt");
+                            String command = "logcat -f " + logErrFile + " -v time *:E";
+                            process = Runtime.getRuntime().exec(command);
+                        }else{
+                            String command = "logcat -f " + logErrFile + " -v time *:E";
+                            process = Runtime.getRuntime().exec(command);
+                        }
+                    }else{
+                        String command = "logcat -f " + logErrFile + " -v time *:E";
+                        process = Runtime.getRuntime().exec(command);
+                    }
+                }
+            } catch (IOException e) {
+                Log.e("WRITE LOG FILE", e.getMessage(), e);
+                e.printStackTrace();
+            }
+
+        } else if (isExternalStorageReadable()) {
+            // only readable
+        } else {
+            // not accessible
+        }
+    }
+
+
+    /*public void writeLogFile() {
         if (isExternalStorageWritable()) {
 
             File appDirectory = new File(Environment.getExternalStorageDirectory() + "/RORO_AppLogs");
@@ -499,7 +553,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
         } else {
             // not accessible
         }
-    }
+    }*/
 
     private void loadMap(GoogleMap googleMap) {
         if (googleMap != null && listener != null) {

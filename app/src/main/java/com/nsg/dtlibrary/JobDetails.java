@@ -179,6 +179,6 @@ public class JobDetails extends Activity {
             adapter = null;
         }
 
-        super.onDestroy();
+       // super.onDestroy();
     }
 }

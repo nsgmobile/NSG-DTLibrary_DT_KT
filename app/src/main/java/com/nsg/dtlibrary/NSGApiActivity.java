@@ -310,7 +310,7 @@ private String GeoFenceCordinates="\n" +
     String CSVFile_Path= Environment.getExternalStorageDirectory() + File.separator + "MBTILES" + File.separator + "RouteSample"+".txt";
   //  com.nsg.dtlibrary.NavigationProperties properties=new com.nsg.dtlibrary.NavigationProperties();
 
-    NSGIMapFragmentActivity test =new NSGIMapFragmentActivity(BASE_MAP_URL_FORMAT,SourcePosition,DestinationPosition,routeData,bufferSize,routeDeviatedDT_URL,AuthorisationKey,GeoFenceCordinates,true);
+    NSGIMapFragmentActivity test =new NSGIMapFragmentActivity(BASE_MAP_URL_FORMAT,SourcePosition,DestinationPosition,routeData,bufferSize,routeDeviatedDT_URL,AuthorisationKey,GeoFenceCordinates,false,true);
   // NSGTiledLayerOnMap test = new NSGTiledLayerOnMap(BASE_MAP_URL_FORMAT);
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -348,7 +348,7 @@ private String GeoFenceCordinates="\n" +
 
     @Override
     public String communicate(String comm, int alertType) {
-         Log.e("Started","Started communicate"+ comm +","+alertType);
+        // Log.e("Started","Started communicate"+ comm +","+alertType);
         if(alertType==MapEvents.ALERTTYPE_6){
             // if alert recieved you can start navigation here
             //test.startNavigation();
