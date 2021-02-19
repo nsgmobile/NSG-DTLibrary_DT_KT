@@ -1457,6 +1457,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
             // send eta message only one time
             isETACrossed = true;
             sendData(timeTmp.toString(), MapEvents.ALERTTYPE_7);
+            Log.i("ETA CROSSED", "ETA CROSSED ALERTTYPE-7 ---- " + timeTakenTillNow);
         }
 
     }
