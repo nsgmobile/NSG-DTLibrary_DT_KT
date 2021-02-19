@@ -488,13 +488,16 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 if(isWriteLogFile==true) {
                     process = Runtime.getRuntime().exec("logcat -f " + logFile);
                 }
+                /*
                 if(isExceptionLogEnable==true){
                     File logErrFile  = new File(logDirectory, "RORO_Log_err" + lng + ".txt");
                     String command = "logcat -f " + logErrFile + " -v time *:E";
                     process = Runtime.getRuntime().exec(command);
                 }
-               /* if(isExceptionLogEnable==true){
-                     logErrFile  = new File(logDirectory, "RORO_Log_err" + ".txt");
+
+                 */
+                if(isExceptionLogEnable==true){
+                    File logErrFile  = new File(logDirectory, "RORO_Log_err" + ".txt");
                     if(logErrFile.exists()) {
                         boolean isFileDeleted = logErrFile.delete();
                         if(isFileDeleted==true) {
@@ -509,7 +512,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                         String command = "logcat -f " + logErrFile + " -v time *:E";
                         process = Runtime.getRuntime().exec(command);
                     }
-                }*/
+                }
             } catch (IOException e) {
                 Log.e("WRITE LOG FILE", e.getMessage(), e);
                 e.printStackTrace();
@@ -788,7 +791,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                             }
                         }
 
-                    }, 10L, 8000L);
+                    }, 5L, 8000L);
 //                    } //end of Timer if
 
                     mMap.setMyLocationEnabled(true);
