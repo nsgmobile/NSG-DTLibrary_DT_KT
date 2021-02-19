@@ -481,33 +481,25 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 logDirectory.mkdir();
             }
 
-            // clear the previous logcat and then write the new one to the file in case of exception
+            // clear the previous logcat and then write the new one to the file
             try {
                 File logFile = new File(logDirectory, "RORO_Log" + lng + ".txt");
                 Process process = Runtime.getRuntime().exec("logcat -c");
                 if(isWriteLogFile==true) {
                     process = Runtime.getRuntime().exec("logcat -f " + logFile);
                 }
-                /*
-                if(isExceptionLogEnable==true){
-                    File logErrFile  = new File(logDirectory, "RORO_Log_err" + lng + ".txt");
-                    String command = "logcat -f " + logErrFile + " -v time *:E";
-                    process = Runtime.getRuntime().exec(command);
-                }
-
-                 */
                 if(isExceptionLogEnable==true){
                     File logErrFile  = new File(logDirectory, "RORO_Log_err" + ".txt");
                     if(logErrFile.exists()) {
-                        boolean isFileDeleted = logErrFile.delete();
-                        if(isFileDeleted==true) {
-                            logErrFile  = new File(logDirectory, "RORO_Log_err" + ".txt");
-                            String command = "logcat -f " + logErrFile + " -v time *:E";
-                            process = Runtime.getRuntime().exec(command);
-                        }else{
-                            String command = "logcat -f " + logErrFile + " -v time *:E";
-                            process = Runtime.getRuntime().exec(command);
-                        }
+                        // boolean isFileDeleted = logErrFile.delete();
+                        // if(isFileDeleted==true) {
+                        //logErrFile  = new File(logDirectory, "RORO_Log_err" + ".txt");
+                        String command = "logcat -f " + logErrFile + " -v time *:E";
+                        process = Runtime.getRuntime().exec(command);
+                        // }else{
+                        //     String command = "logcat -f " + logErrFile + " -v time *:E";
+                        //    process = Runtime.getRuntime().exec(command);
+                        // }
                     }else{
                         String command = "logcat -f " + logErrFile + " -v time *:E";
                         process = Runtime.getRuntime().exec(command);
