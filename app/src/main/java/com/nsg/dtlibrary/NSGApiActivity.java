@@ -360,7 +360,7 @@ private String GeoFenceCordinates="\n" +
         }else if(alertType==MapEvents.ALERTTYPE_3){
 
         }else if(alertType==MapEvents.ALERTTYPE_4) {
-
+            /*
             AlertDialog.Builder builder = new AlertDialog.Builder(NSGApiActivity.this, R.style.yourDialog);
             builder.setTitle("Alert");
             builder.setIcon(R.drawable.car_icon_32);
@@ -373,6 +373,8 @@ private String GeoFenceCordinates="\n" +
                     });
             AlertDialog alert = builder.create();
             alert.show();
+
+             */
 
 
 

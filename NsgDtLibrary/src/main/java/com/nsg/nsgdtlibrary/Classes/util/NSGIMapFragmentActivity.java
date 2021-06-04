@@ -699,6 +699,8 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 from external service and strts navigation if route deviation not observed move in the loaded path
                 if route deviation observed movement from route deviated path only
              */
+        Log.d("APP DATA ", "Navigation Started on 04-june-2021 on  RORO KT Session ---" + oldGPSPosition);
+
 
         islocationControlEnabled = false;
         Log.d("APP DATA ", "islocationControlEnabled START BUTTON GPS POSITION ----" + oldGPSPosition);
@@ -759,7 +761,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                                     int minute = estimatedRemainingTime / 60;
                                                     int sec = estimatedRemainingTime % 60;
                                                     etaMessage = "ETA: " + minute + "min. " + sec + "sec";
-                                                } else {
+                                                                                   } else {
                                                     etaMessage = "ETA: " + estimatedRemainingTime + "sec";
                                                 }
                                                 /*   //Need To Enable Later ##################1
@@ -775,6 +777,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                                                 */
 
                                             }
+
                                         });
                                     }
 
