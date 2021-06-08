@@ -699,9 +699,10 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
                 from external service and strts navigation if route deviation not observed move in the loaded path
                 if route deviation observed movement from route deviated path only
              */
-        Log.d("APP DATA ", "Navigation Started on 04-june-2021 on  RORO KT Session ---" );
+       // Log.d("APP DATA ", "Navigation Started on 04-june-2021 on  RORO KT Session ---" );
 
-        Log.d("APP DATA ", "Navigation Started on 08-june-2021 on  RORO KT Session changed by Ashok---" );
+       // Log.d("APP DATA ", "Navigation Started on 08-june-2021 on  RORO KT Session changed by Ashok---" );
+        Log.d("APP DATA ", "Navigation Started on 08-june-2021 on   changed by Ashok second time---" );
         islocationControlEnabled = false;
         Log.d("APP DATA ", "islocationControlEnabled START BUTTON GPS POSITION ----" + oldGPSPosition);
 
