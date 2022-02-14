@@ -678,6 +678,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
             mMap.setMyLocationEnabled(true);
             if (mPositionMarker != null) {
                 LatLng myLocation = null;
+
                 myLocation = mPositionMarker.getPosition();
                 int height = 0;
                 if (getView() != null) {
