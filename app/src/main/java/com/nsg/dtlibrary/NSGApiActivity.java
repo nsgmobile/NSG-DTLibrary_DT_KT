@@ -321,10 +321,7 @@ private String GeoFenceCordinates="\n" +
         Start.setOnClickListener(this);
         Stop=(Button)findViewById(R.id.stop);
         Stop.setOnClickListener(this);
-
         //Start.setOnClickListener(new  on);
-
-
 
         Bundle NSGIBundle = getIntent().getExtras();
         charlsisNumber = NSGIBundle.getString("charlsisNumber");
