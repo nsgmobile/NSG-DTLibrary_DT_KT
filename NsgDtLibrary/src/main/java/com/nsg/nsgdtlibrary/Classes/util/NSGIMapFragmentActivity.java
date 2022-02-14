@@ -827,7 +827,7 @@ public class NSGIMapFragmentActivity extends Fragment implements View.OnClickLis
 
                                     if (!isNavigationStarted || isFragmentDestroyed) {
 
-                                        Log.i("stopNavigation", "removed navigation and mytimer 11");
+                                        Log.i("stopNavigation", "removed navigation and mytimer 11222");
 
                                         tmpHandler.removeCallbacksAndMessages(null);
                                         tmpHandler.removeCallbacks(this);
